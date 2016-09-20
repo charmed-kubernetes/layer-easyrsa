@@ -1,0 +1,9 @@
+includes: ['layer:basic', 'layer:leadership', 'interface:tls-certificates']
+options:
+  basic:
+    packages:
+      - openssl
+repo: http://github.com/juju-solutions/layer-easyrsa.git
+exclude:
+  - tests/10-deploy.py
+  - tests/tests.yaml

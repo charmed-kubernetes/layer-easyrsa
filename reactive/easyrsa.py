@@ -1,10 +1,13 @@
 import os
+import shutil
 
 from shlex import split
 from subprocess import check_call
 from subprocess import check_output
 
+from charms.reactive import hook
 from charms.reactive import is_state
+from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import when
 from charms.reactive import when_not
@@ -62,8 +65,15 @@ def install():
                                                  easyrsa_directory)
     check_call(split(link))
 
-    with chdir(easyrsa_directory):
-        check_call(split('./easyrsa --batch init-pki 2>&1'))
+    charm_pki_directory = os.path.join(charm_directory, 'pki')
+    if os.path.isdir(charm_pki_directory):
+        new_pki_directory = os.path.join(easyrsa_directory, 'pki')
+        # Copy the pki in this new directory.
+        shutil.copytree(charm_pki_directory, new_pki_directory, symlinks=True)
+    else:
+        # Create new pki.
+        with chdir(easyrsa_directory):
+            check_call(split('./easyrsa --batch init-pki 2>&1'))
     set_state('easyrsa.installed')
 
 
@@ -208,6 +218,18 @@ def create_server_cert(tls):
         server_cert, server_key = create_server_certificate(cn, sans, name)
         # Set the certificate and key for the unit on the relationship object.
         tls.set_server_cert(unit_name, server_cert, server_key)
+
+
+@hook('upgrade-charm')
+def upgrade():
+    '''An upgrade has been triggered.'''
+    pki_directory = os.path.join(easyrsa_directory, 'pki')
+    if os.path.isdir(pki_directory):
+        charm_pki_directory = os.path.join(charm_directory, 'pki')
+        # Copy the pki in this new directory.
+        shutil.copytree(pki_directory, charm_pki_directory, symlinks=True)
+    remove_state('easyrsa.installed')
+    remove_state('easyrsa.configured')
 
 
 def create_server_certificate(cn, san_list, name='server'):

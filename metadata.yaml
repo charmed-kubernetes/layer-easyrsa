@@ -21,3 +21,6 @@ resources:
       This charm was written using v3.0.1, so earlier versions of EasyRSA may 
       not work. You can find the releases of EasyRSA at 
       https://github.com/OpenVPN/easy-rsa/releases
+series:
+  - xenial
+  - trusty

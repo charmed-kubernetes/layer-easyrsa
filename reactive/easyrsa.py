@@ -64,12 +64,17 @@ def install():
                                                  version,
                                                  easyrsa_directory)
     check_call(split(link))
-
+    # The charm pki directory contains backup of pki for upgrades.
     charm_pki_directory = os.path.join(charm_directory, 'pki')
     if os.path.isdir(charm_pki_directory):
         new_pki_directory = os.path.join(easyrsa_directory, 'pki')
-        # Copy the pki in this new directory.
-        shutil.copytree(charm_pki_directory, new_pki_directory, symlinks=True)
+        # Only copy the directory if the new_pki_directory does not exist.
+        if not os.path.isdir(new_pki_directory):
+            # Copy the pki to this new directory.
+            shutil.copytree(charm_pki_directory, new_pki_directory,
+                            symlinks=True)
+        # We are done with the old charm pki directory, so delete contents.
+        shutil.rmtree(charm_pki_directory)
     else:
         # Create new pki.
         with chdir(easyrsa_directory):
@@ -226,7 +231,10 @@ def upgrade():
     pki_directory = os.path.join(easyrsa_directory, 'pki')
     if os.path.isdir(pki_directory):
         charm_pki_directory = os.path.join(charm_directory, 'pki')
-        # Copy the pki in this new directory.
+        # When the charm pki directory exists, it is stale, remove it.
+        if os.path.isdir(charm_pki_directory):
+            shutil.rmtree(charm_pki_directory)
+        # Copy the EasyRSA/pki to the charm pki directory.
         shutil.copytree(pki_directory, charm_pki_directory, symlinks=True)
     remove_state('easyrsa.installed')
     remove_state('easyrsa.configured')

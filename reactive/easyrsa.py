@@ -203,7 +203,7 @@ def send_ca(tls):
     tls.set_client_cert(client_cert, client_key)
 
 
-@when('client.server.cert.requested')
+@when('client.server.cert.requested', 'easyrsa.configured')
 def create_server_cert(tls):
     '''Create server certificates with the request information from the
     relation object.'''

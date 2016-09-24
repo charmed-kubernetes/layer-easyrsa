@@ -11,7 +11,7 @@ seconds = 990
 
 
 class TestDeployment(unittest.TestCase):
-    '''A unittest class to test the results of deploying the tls layer.'''
+    '''A unittest class to test the results of deploying the easyrsa charm.'''
 
     @classmethod
     def setUpClass(cls):
@@ -36,11 +36,13 @@ class TestDeployment(unittest.TestCase):
         charm_dir = '/var/lib/juju/agents/unit-{service}-{unit}/charm'.format(
             **self.unit.info)
         easyrsa_dir = os.path.join(charm_dir, 'EasyRSA')
+        # Create a path to the easyrsa schell script.
         easyrsa_path = os.path.join(easyrsa_dir, 'easyrsa')
         # Get the contents of the easyrsa shell script.
         easyrsa = self.unit.file_contents(easyrsa_path)
         self.assertIsNotNone(easyrsa)
         self.assertNotEqual(easyrsa, '')
+        self.assertTrue('Easy-RSA' in easyrsa)
 
     def test_ca(self):
         '''Test that the ca and key were created.'''

@@ -1,4 +1,7 @@
-includes: ['layer:basic', 'layer:leadership', 'interface:tls-certificates']
+includes:
+  - 'layer:basic'
+  - 'layer:leadership'
+  - 'interface:tls-certificates'
 options:
   basic:
     packages:

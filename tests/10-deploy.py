@@ -60,8 +60,9 @@ class TestDeployment(unittest.TestCase):
         ca_key = self.unit.file_contents(key_path)
         self.assertTrue(validate_key(ca_key))
         # Create an absolute path to the installed location of the ca.
-        installed_path = '/usr/local/share/ca-certificates/ca.crt'
-        installed_ca = self.unit.file_contents(installed_path)
+        ca_crt_path = '/usr/local/share/ca-certificates/{service}.crt'.format(
+            **self.unit.info)
+        installed_ca = self.unit.file_contents(ca_crt_path)
         self.assertTrue(validate_certificate(installed_ca))
         self.assertEqual(ca_cert, installed_ca)
 

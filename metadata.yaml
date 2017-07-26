@@ -3,7 +3,12 @@ summary: Delivers EasyRSA to create a Certificate Authority (CA).
 description: |
   This charm delivers the EasyRSA application and through Juju events creates
   a Certificate Authority (CA), server certificates, and client certificates.
-maintainer: Matthew Bruzek <matthew.bruzek@canonical.com>
+maintainers:
+  - Tim Van Steenburgh <tim.van.steenburgh@canonical.com>
+  - George Kraft <george.kraft@canonical.com>
+  - Rye Terrell <rye.terrell@canonical.com>
+  - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
+  - Matthew Bruzek <matthew.bruzek@canonical.com>
 tags:
   - tls
   - pki

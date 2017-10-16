@@ -260,9 +260,10 @@ def create_server_certificate(cn, san_list, name='server'):
         sans = get_sans(san_list)
         this_cert = {'sans': sans, 'cn': cn, 'name': name}
         changed = data_changed('server_cert', this_cert)
+        cert_exists = os.path.isfile(cert_file) and os.path.isfile(key_file)
         # Do not regenerate the server certificate if it already exists
         # and the data hasn't changed.
-        if changed:
+        if changed and cert_exists:
             # We need to revoke the existing cert and regenerate it
             revoke = './easyrsa --batch revoke {0}'.format(name)
             check_call(split(revoke))
@@ -270,7 +271,6 @@ def create_server_certificate(cn, san_list, name='server'):
             remove_file_if_exists(cert_file)
             remove_file_if_exists(key_file)
             remove_file_if_exists(req_file)
-        cert_exists = os.path.isfile(cert_file) and os.path.isfile(key_file)
         if changed or not cert_exists:
             # Get a string compatible with easyrsa for the subject-alt-names.
             # Create a server certificate for the server based on the CN.

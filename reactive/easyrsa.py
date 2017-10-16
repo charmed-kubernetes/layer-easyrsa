@@ -11,6 +11,7 @@ from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import when
 from charms.reactive import when_not
+from charms.reactive.helpers import data_changed
 
 from charmhelpers.core import hookenv
 from charmhelpers.core import unitdata
@@ -258,7 +259,7 @@ def create_server_certificate(cn, san_list, name='server'):
         # Get a string compatible with easyrsa for the subject-alt-names.
         sans = get_sans(san_list)
         this_cert = {'sans': sans, 'cn': cn, 'name': name}
-        changed = helpers.data_changed('server_cert', this_cert)
+        changed = data_changed('server_cert', this_cert)
         # Do not regenerate the server certificate if it already exists
         # and the data hasn't changed.
         if changed:

@@ -244,6 +244,13 @@ def upgrade():
     remove_state('easyrsa.configured')
 
 
+def remove_file_if_exists(filename):
+    try:
+        os.remove(filename)
+    except FileNotFoundError:
+        pass
+
+
 def create_server_certificate(cn, san_list, name='server'):
     '''Return a newly created server certificate and server key from a
     common name, list of Subject Alternate Names, and the certificate name.'''

@@ -279,7 +279,6 @@ def create_server_certificate(cn, san_list, name='server'):
             remove_file_if_exists(key_file)
             remove_file_if_exists(req_file)
         if changed or not cert_exists:
-            # Get a string compatible with easyrsa for the subject-alt-names.
             # Create a server certificate for the server based on the CN.
             server = './easyrsa --batch --req-cn={0} --subject-alt-name={1} ' \
                      'build-server-full {2} nopass 2>&1'.format(cn, sans, name)

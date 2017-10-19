@@ -266,7 +266,7 @@ def create_server_certificate(cn, san_list, name='server'):
         # Get a string compatible with easyrsa for the subject-alt-names.
         sans = get_sans(san_list)
         this_cert = {'sans': sans, 'cn': cn, 'name': name}
-        changed = data_changed('server_cert', this_cert)
+        changed = data_changed('server_cert.' + name, this_cert)
         cert_exists = os.path.isfile(cert_file) and os.path.isfile(key_file)
         # Do not regenerate the server certificate if it already exists
         # and the data hasn't changed.

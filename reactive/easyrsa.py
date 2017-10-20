@@ -11,6 +11,7 @@ from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import when
 from charms.reactive import when_not
+from charms.reactive.helpers import data_changed
 
 from charmhelpers.core import hookenv
 from charmhelpers.core import unitdata
@@ -243,6 +244,13 @@ def upgrade():
     remove_state('easyrsa.configured')
 
 
+def remove_file_if_exists(filename):
+    try:
+        os.remove(filename)
+    except FileNotFoundError:
+        pass
+
+
 def create_server_certificate(cn, san_list, name='server'):
     '''Return a newly created server certificate and server key from a
     common name, list of Subject Alternate Names, and the certificate name.'''
@@ -253,10 +261,24 @@ def create_server_certificate(cn, san_list, name='server'):
         cert_file = 'pki/issued/{0}.crt'.format(name)
         # Create the path to the server key.
         key_file = 'pki/private/{0}.key'.format(name)
-        # Do not regenerate the server certificate if it already exists.
-        if not os.path.isfile(cert_file) and not os.path.isfile(key_file):
-            # Get a string compatible with easyrsa for the subject-alt-names.
-            sans = get_sans(san_list)
+        # Create the path to the request file
+        req_file = 'pki/reqs/{0}.req'.format(name)
+        # Get a string compatible with easyrsa for the subject-alt-names.
+        sans = get_sans(san_list)
+        this_cert = {'sans': sans, 'cn': cn, 'name': name}
+        changed = data_changed('server_cert.' + name, this_cert)
+        cert_exists = os.path.isfile(cert_file) and os.path.isfile(key_file)
+        # Do not regenerate the server certificate if it already exists
+        # and the data hasn't changed.
+        if changed and cert_exists:
+            # We need to revoke the existing cert and regenerate it
+            revoke = './easyrsa --batch revoke {0}'.format(name)
+            check_call(split(revoke))
+            # nuke old files if they exist
+            remove_file_if_exists(cert_file)
+            remove_file_if_exists(key_file)
+            remove_file_if_exists(req_file)
+        if changed or not cert_exists:
             # Create a server certificate for the server based on the CN.
             server = './easyrsa --batch --req-cn={0} --subject-alt-name={1} ' \
                      'build-server-full {2} nopass 2>&1'.format(cn, sans, name)

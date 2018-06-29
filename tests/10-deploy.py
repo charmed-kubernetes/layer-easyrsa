@@ -27,7 +27,7 @@ class TestDeployment(unittest.TestCase):
         except amulet.helpers.TimeoutError:
             msg = 'The model did not set up in {0} seconds!'.format(seconds)
             amulet.raise_status(amulet.SKIP, msg=msg)
-        except:
+        except Exception:
             raise
         cls.unit = cls.deployment.sentry[charm_name][0]
 

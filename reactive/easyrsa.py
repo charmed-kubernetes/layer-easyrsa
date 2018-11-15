@@ -6,12 +6,13 @@ from subprocess import check_call
 from subprocess import check_output
 
 from charms.reactive import hook
-from charms.reactive import is_state
-from charms.reactive import remove_state
-from charms.reactive import set_state
 from charms.reactive import when
 from charms.reactive import when_not
 from charms.reactive.helpers import data_changed
+from charms.reactive.relations import endpoint_from_flag
+from charms.reactive.flags import is_flag_set
+from charms.reactive.flags import clear_flag
+from charms.reactive.flags import set_flag
 
 from charmhelpers.core import hookenv
 from charmhelpers.core import unitdata
@@ -83,7 +84,7 @@ def install():
         # Create new pki.
         with chdir(easyrsa_directory):
             check_call(split('./easyrsa --batch init-pki 2>&1'))
-    set_state('easyrsa.installed')
+    set_flag('easyrsa.installed')
 
 
 @when('easyrsa.installed')
@@ -102,7 +103,7 @@ def configure_easyrsa():
     configure_copy_extensions()
     hookenv.log('Configuring X509 server extensions with clientAuth.')
     configure_client_authorization()
-    set_state('easyrsa.configured')
+    set_flag('easyrsa.configured')
 
 
 def configure_copy_extensions():
@@ -186,13 +187,13 @@ def create_certificate_authority():
         leader_set({'client_certificate': client_cert})
         leader_set({'client_key': client_key})
         status_set('active', 'Certificiate Authority available')
-    set_state('easyrsa.certificate.authority.available')
+    set_flag('easyrsa.certificate.authority.available')
 
 
 @when('easyrsa.certificate.authority.available')
 def message():
     '''Set a message to notify the user that this charm is ready.'''
-    if is_state('client.available'):
+    if is_flag_set('client.available'):
         status_set('active', 'Certificate Authority connected.')
     else:
         status_set('active', 'Certificate Authority ready.')
@@ -200,9 +201,10 @@ def message():
 
 @when('client.available', 'easyrsa.certificate.authority.available')
 @when('leadership.is_leader')
-def send_ca(tls):
+def send_ca():
     '''The client relationship has been established, read the CA and client
     certificate from leadership data to set them on the relationship object.'''
+    tls = endpoint_from_flag('client.available')
     certificate_authority = leader_get('certificate_authority')
     tls.set_ca(certificate_authority)
     # The client cert and key should be same for all connections.
@@ -212,21 +214,56 @@ def send_ca(tls):
     tls.set_client_cert(client_cert, client_key)
 
 
+@when('leadership.is_leader',
+      'easyrsa.certificate.authority.available',
+      'client.available')
+@when_not('easyrsa.global-client-cert.created')
+def publish_global_client_cert():
+    """
+    This is for backwards compatibility with older tls-certificate clients
+    only.  Obviously, it's not good security / design to have clients sharing
+    a certificate, but it seems that there are clients that depend on this
+    (though some, like etcd, only block on the flag that it triggers but don't
+    actually use the cert), so we have to set it for now.
+    """
+    tls = endpoint_from_flag('client.available')
+    client_cert, client_key = create_client_certificate()
+    tls.set_client_cert(client_cert, client_key)
+    set_flag('easyrsa.global-client-cert.created')
+
+
 @when('client.server.cert.requested', 'easyrsa.configured')
-def create_server_cert(tls):
+def create_server_cert():
     '''Create server certificates with the request information from the
     relation object.'''
-    # Get the map of unit names to requests.
-    requests = tls.get_server_requests()
-    # Iterate over all items in the map.
-    for unit_name, request in requests.items():
-        cn = request.get('common_name')
-        sans = request.get('sans')
-        name = request.get('certificate_name')
+
+    tls = endpoint_from_flag('client.server.cert.requested')
+
+    # Iterate over all new requests
+    for request in tls.new_server_requests:
+        cn = request.common_name
+        sans = request.sans
+        name = request.common_name
         # Create the server certificate based on the information in request.
         server_cert, server_key = create_server_certificate(cn, sans, name)
         # Set the certificate and key for the unit on the relationship object.
-        tls.set_server_cert(unit_name, server_cert, server_key)
+        request.set_cert(server_cert, server_key)
+
+
+@when('client.client.certs.requested', 'easyrsa.configured')
+def create_client_cert():
+    '''Create client certificates with the reuqest information from the
+    relation object.'''
+
+    tls = endpoint_from_flag('client.client.cert.requested')
+
+    # Iterate over all new requests
+    for request in tls.new_client_requests:
+        # Create a client certificate for this request.
+        name = request.get('certificate_name')
+        client_cert, client_key = create_client_certificate(name)
+        # Set the client certificate and key on the relationship object.
+        request.set_cert(client_cert, client_key)
 
 
 @hook('upgrade-charm')
@@ -240,8 +277,8 @@ def upgrade():
             shutil.rmtree(charm_pki_directory)
         # Copy the EasyRSA/pki to the charm pki directory.
         shutil.copytree(pki_directory, charm_pki_directory, symlinks=True)
-    remove_state('easyrsa.installed')
-    remove_state('easyrsa.configured')
+    clear_flag('easyrsa.installed')
+    clear_flag('easyrsa.configured')
 
 
 def remove_file_if_exists(filename):

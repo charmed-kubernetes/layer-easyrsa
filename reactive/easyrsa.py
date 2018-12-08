@@ -1,5 +1,6 @@
 import os
 import shutil
+import uuid
 
 from shlex import split
 from subprocess import check_call
@@ -181,11 +182,6 @@ def create_certificate_authority():
         leader_set({'certificate_authority_key': ca_key})
         # Install the CA on this system as a trusted CA.
         install_ca(certificate_authority)
-        # Create a client certificate for this CA.
-        client_cert, client_key = create_client_certificate()
-        # Set the client certificate and key on leadership data.
-        leader_set({'client_certificate': client_cert})
-        leader_set({'client_key': client_key})
         status_set('active', 'Certificiate Authority available')
     set_flag('easyrsa.certificate.authority.available')
 
@@ -207,11 +203,6 @@ def send_ca():
     tls = endpoint_from_flag('client.available')
     certificate_authority = leader_get('certificate_authority')
     tls.set_ca(certificate_authority)
-    # The client cert and key should be same for all connections.
-    client_cert = leader_get('client_certificate')
-    client_key = leader_get('client_key')
-    # Set the client certificate and key on the relationship object.
-    tls.set_client_cert(client_cert, client_key)
 
 
 @when('leadership.is_leader',
@@ -227,7 +218,18 @@ def publish_global_client_cert():
     actually use the cert), so we have to set it for now.
     """
     tls = endpoint_from_flag('client.available')
-    client_cert, client_key = create_client_certificate()
+    client_cert = leader_get('client_certificate')
+    client_key = leader_get('client_key')
+    if not client_cert or not client_key:
+        hookenv.log("Unable to find global client cert on "
+                    "leadership data, generating...")
+        client_cert, client_key = create_client_certificate()
+        # Set the client certificate and key on leadership data.
+        leader_set({'client_certificate': client_cert})
+        leader_set({'client_key': client_key})
+    else:
+        hookenv.log("found global client cert on leadership "
+                    "data, not generating...")
     tls.set_client_cert(client_cert, client_key)
     set_flag('easyrsa.global-client-cert.created')
 
@@ -252,7 +254,7 @@ def create_server_cert():
 
 @when('client.client.certs.requested', 'easyrsa.configured')
 def create_client_cert():
-    '''Create client certificates with the reuqest information from the
+    '''Create client certificates with the request information from the
     relation object.'''
 
     tls = endpoint_from_flag('client.client.cert.requested')
@@ -260,7 +262,7 @@ def create_client_cert():
     # Iterate over all new requests
     for request in tls.new_client_requests:
         # Create a client certificate for this request.
-        name = request.get('certificate_name')
+        name = str(uuid.uuid4())
         client_cert, client_key = create_client_certificate(name)
         # Set the client certificate and key on the relationship object.
         request.set_cert(client_cert, client_key)
@@ -349,6 +351,8 @@ def create_client_certificate(name='client'):
         # Read the client key from the file system.
         with open(key_file, 'r') as stream:
             client_key = stream.read()
+        os.remove(cert_file)
+        os.remove(key_file)
     return client_cert, client_key
 
 

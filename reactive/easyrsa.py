@@ -290,9 +290,11 @@ def remove_file_if_exists(filename):
         pass
 
 
-def create_server_certificate(cn, san_list, name='server'):
+def create_server_certificate(cn, san_list, name=None):
     '''Return a newly created server certificate and server key from a
     common name, list of Subject Alternate Names, and the certificate name.'''
+    if name is None:
+        name = 'server'
     server_cert = None
     server_key = None
     with chdir(easyrsa_directory):
@@ -304,6 +306,7 @@ def create_server_certificate(cn, san_list, name='server'):
         req_file = 'pki/reqs/{0}.req'.format(name)
         # Get a string compatible with easyrsa for the subject-alt-names.
         sans = get_sans(san_list)
+        sans_arg = '--subject-alt-name={}'.format(sans) if sans else ''
         this_cert = {'sans': sans, 'cn': cn, 'name': name}
         changed = data_changed('server_cert.' + name, this_cert)
         cert_exists = os.path.isfile(cert_file) and os.path.isfile(key_file)
@@ -319,8 +322,10 @@ def create_server_certificate(cn, san_list, name='server'):
             remove_file_if_exists(req_file)
         if changed or not cert_exists:
             # Create a server certificate for the server based on the CN.
-            server = './easyrsa --batch --req-cn={0} --subject-alt-name={1} ' \
-                     'build-server-full {2} nopass 2>&1'.format(cn, sans, name)
+            server = './easyrsa --batch --req-cn={0} {1} ' \
+                     'build-server-full {2} nopass 2>&1'.format(cn,
+                                                                sans_arg,
+                                                                name)
             check_call(split(server))
         # Read the server certificate from the file system.
         with open(cert_file, 'r') as stream:

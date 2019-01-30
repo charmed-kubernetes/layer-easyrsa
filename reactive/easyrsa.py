@@ -234,12 +234,12 @@ def publish_global_client_cert():
     set_flag('easyrsa.global-client-cert.created')
 
 
-@when('client.server.cert.requested', 'easyrsa.configured')
+@when('client.server.certs.requested', 'easyrsa.configured')
 def create_server_cert():
     '''Create server certificates with the request information from the
     relation object.'''
 
-    tls = endpoint_from_flag('client.server.cert.requested')
+    tls = endpoint_from_flag('client.server.certs.requested')
 
     # Iterate over all new requests
     for request in tls.new_server_requests:
@@ -257,7 +257,7 @@ def create_client_cert():
     '''Create client certificates with the request information from the
     relation object.'''
 
-    tls = endpoint_from_flag('client.client.cert.requested')
+    tls = endpoint_from_flag('client.client.certs.requested')
 
     # Iterate over all new requests
     for request in tls.new_client_requests:

@@ -1,6 +1,5 @@
 import os
 import shutil
-import uuid
 
 from shlex import split
 from subprocess import check_call
@@ -262,7 +261,7 @@ def create_client_cert():
     # Iterate over all new requests
     for request in tls.new_client_requests:
         # Create a client certificate for this request.
-        name = str(uuid.uuid4())
+        name = request.common_name
         client_cert, client_key = create_client_certificate(name)
         # Set the client certificate and key on the relationship object.
         request.set_cert(client_cert, client_key)
@@ -348,7 +347,7 @@ def create_client_certificate(name='client'):
         # Do not regenerate the client certificate if it already exists.
         if not os.path.isfile(cert_file) and not os.path.isfile(key_file):
             # Create a client certificate and key.
-            client = './easyrsa build-client-full {0} nopass 2>&1'.format(name)
+            client = './easyrsa build-client-full {0} nopass'.format(name)
             check_call(split(client))
         # Read the client certificate from the file system.
         with open(cert_file, 'r') as stream:
@@ -356,8 +355,6 @@ def create_client_certificate(name='client'):
         # Read the client key from the file system.
         with open(key_file, 'r') as stream:
             client_key = stream.read()
-        os.remove(cert_file)
-        os.remove(key_file)
     return client_cert, client_key
 
 

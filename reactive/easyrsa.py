@@ -158,30 +158,73 @@ def configure_client_authorization():
 def create_certificate_authority():
     '''Return the CA and server certificates for this system. If the CA is
     empty, generate a self signged certificate authority.'''
+    ca_file = 'pki/ca.crt'
+    key_file = 'pki/private/ca.key'
+    serial_file = 'pki/serial'
+
     with chdir(easyrsa_directory):
-        # The Common Name (CN) for a certificate must be an IP or hostname.
-        cn = hookenv.unit_public_ip()
-        # Create a self signed CA with the CN, stored pki/ca.crt
-        build_ca = './easyrsa --batch "--req-cn={0}" build-ca nopass 2>&1'
-        # Build a self signed Certificate Authority.
-        check_call(split(build_ca.format(cn)))
+        if leader_get('certificate_authority') and \
+                leader_get('certificate_authority_key'):
+            hookenv.log('Recovering CA from controller')
+            certificate_authority = \
+                leader_get('certificate_authority')
+            certificate_authority_key = \
+                leader_get('certificate_authority_key')
+            certificate_authority_serial = \
+                leader_get('certificate_authority_serial')
 
-        ca_file = 'pki/ca.crt'
-        # Read the CA so it can be returned in leader data.
-        with open(ca_file, 'r') as stream:
-            certificate_authority = stream.read()
+            # Write the CA from existing relation.
+            with open(ca_file, 'w') as f_out:
+                f_out.write(certificate_authority)
 
-        key_file = 'pki/private/ca.key'
-        # Read the private key so it can be set in leader data.
-        with open(key_file, 'r') as stream:
-            ca_key = stream.read()
+            # Write the private key from existing relation.
+            with open(key_file, 'w') as f_out:
+                f_out.write(certificate_authority_key)
 
-        # Set these values on the leadership data.
-        leader_set({'certificate_authority': certificate_authority})
-        leader_set({'certificate_authority_key': ca_key})
-        # Install the CA on this system as a trusted CA.
-        install_ca(certificate_authority)
-        status_set('active', 'Certificiate Authority available')
+            # Write the serial from existing relation.
+            with open(serial_file, 'w') as f_out:
+                f_out.write(certificate_authority_serial)
+
+            # Bluff required files and folders.
+            with open('pki/index.txt', 'w') as f_out:
+                pass
+            os.makedirs('pki/issued')
+            os.makedirs('pki/certs_by_serial')
+
+        else:
+            hookenv.log('Creating new CA')
+            # The Common Name (CN) for a certificate
+            # must be an IP or hostname.
+            cn = hookenv.unit_public_ip()
+            # Create a self signed CA with the CN, stored pki/ca.crt
+            build_ca = \
+                './easyrsa --batch "--req-cn={0}" build-ca nopass 2>&1'
+            # Build a self signed Certificate Authority.
+            check_call(split(build_ca.format(cn)))
+
+            # Read the CA so it can be returned in leader data.
+            with open(ca_file, 'r') as stream:
+                certificate_authority = stream.read()
+
+            # Read the private key so it can be set in leader data.
+            with open(key_file, 'r') as stream:
+                certificate_authority_key = stream.read()
+
+            with open(serial_file, 'r') as stream:
+                certificate_authority_serial = stream.read()
+
+    # Set these values on the leadership data.
+    leader_set({
+        'certificate_authority': certificate_authority})
+    leader_set({
+        'certificate_authority_key': certificate_authority_key})
+    leader_set({
+        'certificate_authority_serial': certificate_authority_serial})
+
+    # Install the CA on this system as a trusted CA.
+    install_ca(certificate_authority)
+    status_set('active', 'Certificiate Authority available')
+
     set_flag('easyrsa.certificate.authority.available')
 
 

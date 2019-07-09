@@ -208,7 +208,7 @@ def send_ca():
       'easyrsa.certificate.authority.available',
       'client.available')
 @when_not('easyrsa.global-client-cert.created')
-def publish_global_client_cert():
+def create_global_client_cert():
     """
     This is for backwards compatibility with older tls-certificate clients
     only.  Obviously, it's not good security / design to have clients sharing
@@ -216,7 +216,6 @@ def publish_global_client_cert():
     (though some, like etcd, only block on the flag that it triggers but don't
     actually use the cert), so we have to set it for now.
     """
-    tls = endpoint_from_flag('client.available')
     client_cert = leader_get('client_certificate')
     client_key = leader_get('client_key')
     if not client_cert or not client_key:
@@ -229,8 +228,18 @@ def publish_global_client_cert():
     else:
         hookenv.log("found global client cert on leadership "
                     "data, not generating...")
-    tls.set_client_cert(client_cert, client_key)
     set_flag('easyrsa.global-client-cert.created')
+
+
+@when('leadership.is_leader',
+      'easyrsa.global-client-cert.created',
+      'client.available')
+def publish_global_client_cert():
+    # global client cert needs to always be re-published to account for new
+    # clients joining
+    tls = endpoint_from_flag('client.available')
+    tls.set_client_cert(leader_get('client_certificate'),
+                        leader_get('client_key'))
 
 
 @when('client.server.certs.requested', 'easyrsa.configured')

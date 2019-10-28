@@ -399,8 +399,7 @@ def create_client_certificate(name='client'):
         # Do not regenerate the client certificate if it already exists.
         if not os.path.isfile(cert_file) and not os.path.isfile(key_file):
             # Create a client certificate and key.
-            client = './easyrsa build-client-full {0} nopass'.format(name)
-            check_call(split(client))
+            check_call(['./easyrsa', 'build-client-full', name, 'nopass'])
         # Read the client certificate from the file system.
         with open(cert_file, 'r') as stream:
             client_cert = stream.read()

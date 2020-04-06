@@ -155,6 +155,7 @@ def configure_client_authorization():
 @when('easyrsa.configured')
 @when('leadership.is_leader')
 @when_not('easyrsa.certificate.authority.available')
+@when_not('upgrade.series.in-progress')
 def create_certificate_authority():
     '''Return the CA and server certificates for this system. If the CA is
     empty, generate a self signged certificate authority.'''
@@ -229,6 +230,7 @@ def create_certificate_authority():
 
 
 @when('easyrsa.certificate.authority.available')
+@when_not('upgrade.series.in-progress')
 def message():
     '''Set a message to notify the user that this charm is ready.'''
     if is_flag_set('client.available'):
@@ -332,6 +334,11 @@ def upgrade():
         shutil.copytree(pki_directory, charm_pki_directory, symlinks=True)
     clear_flag('easyrsa.installed')
     clear_flag('easyrsa.configured')
+
+
+@hook('pre-series-upgrade')
+def pre_series_upgrade():
+    status_set('blocked', 'Series upgrade in progress')
 
 
 def remove_file_if_exists(filename):

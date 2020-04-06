@@ -3,7 +3,8 @@ python:
  - '3.5'
 
 install:
- - pip install flake8
+ - pip install flake8 tox-travis
 
 script:
  - flake8 reactive/*.py tests/*.py
+ - tox

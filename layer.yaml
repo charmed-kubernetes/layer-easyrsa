@@ -2,6 +2,7 @@ includes:
   - 'layer:basic'
   - 'layer:debug'
   - 'layer:leadership'
+  - 'layer:status'
   - 'interface:tls-certificates'
 options:
   basic:

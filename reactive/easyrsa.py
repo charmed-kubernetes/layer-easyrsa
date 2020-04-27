@@ -40,18 +40,18 @@ def install():
         message = 'An error occurred fetching the easyrsa resource.'
         hookenv.log(message)
         hookenv.log(e)
-        hookenv.status.blocked(message)
+        status.blocked(message)
         return
 
     if not easyrsa_resource:
-        hookenv.status.blocked('The easyrsa resource is missing.')
+        status.blocked('The easyrsa resource is missing.')
         return
 
     # Get the filesize in bytes.
     filesize = os.stat(easyrsa_resource).st_size
     # When the filesize is less than 10 KB we do not have a real file.
     if filesize < 10240:
-        hookenv.status.blocked('The easyrsa resource is not complete.')
+        status.blocked('The easyrsa resource is not complete.')
         return
 
     # Expand the archive in the charm directory creating an EasyRSA directory.

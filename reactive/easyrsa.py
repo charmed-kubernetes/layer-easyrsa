@@ -336,10 +336,10 @@ def upgrade():
                     leader_get('certificate_authority_key') and not \
                     leader_get('certificate_authority_serial'):
                 with open(serial_file, 'r') as stream:
-                    certificate_authority_serial = stream.read()
+                    ca_serial = stream.read()
                 # set the previously unset certificate authority serial
                 leader_set({
-                    'certificate_authority_serial': certificate_authority_serial})
+                    'certificate_authority_serial': ca_serial})
 
         charm_pki_directory = os.path.join(charm_directory, 'pki')
         # When the charm pki directory exists, it is stale, remove it.

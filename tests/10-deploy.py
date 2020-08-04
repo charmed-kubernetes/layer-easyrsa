@@ -89,7 +89,7 @@ def validate_certificate(cert):
 def validate_key(key):
     '''Return true if the key is valid, false otherwise.'''
     # The key should not be empty string and have begin and end statements.
-    return key and 'BEGIN PRIVATE KEY'in key and 'END PRIVATE KEY' in key
+    return key and 'BEGIN PRIVATE KEY' in key and 'END PRIVATE KEY' in key
 
 
 if __name__ == '__main__':

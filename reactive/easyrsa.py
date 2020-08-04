@@ -164,7 +164,8 @@ def create_certificate_authority():
 
     with chdir(easyrsa_directory):
         if leader_get('certificate_authority') and \
-                leader_get('certificate_authority_key'):
+                leader_get('certificate_authority_key') and \
+                leader_get('certificate_authority_serial'):
             hookenv.log('Recovering CA from controller')
             certificate_authority = \
                 leader_get('certificate_authority')
@@ -324,6 +325,22 @@ def upgrade():
     '''An upgrade has been triggered.'''
     pki_directory = os.path.join(easyrsa_directory, 'pki')
     if os.path.isdir(pki_directory):
+        # specific handling if the upgrade is from a previous version
+        # where certificate_authority_serial is not set at install
+        serial_file = 'serial'
+        with chdir(pki_directory):
+            # if the ca and ca_key are set and serial is not
+            # set this to serial in the pki directory
+            if os.path.isfile(serial_file) and \
+                    leader_get('certificate_authority') and \
+                    leader_get('certificate_authority_key') and not \
+                    leader_get('certificate_authority_serial'):
+                with open(serial_file, 'r') as stream:
+                    ca_serial = stream.read()
+                # set the previously unset certificate authority serial
+                leader_set({
+                    'certificate_authority_serial': ca_serial})
+
         charm_pki_directory = os.path.join(charm_directory, 'pki')
         # When the charm pki directory exists, it is stale, remove it.
         if os.path.isdir(charm_pki_directory):

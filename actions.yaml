@@ -1,0 +1,23 @@
+backup:
+  description: Creates a backup bundle containing current easyrsa pki.
+restore:
+  description: Restores a pki previously backed up by 'backup' action
+  params:
+    name:
+      type: string
+      description: Name of the backup file from which the pki will be restored.
+  required:
+    - name
+list-backups:
+  description: List all available easyrsa backups.
+delete-backup:
+  description: Delete specified (or all) easyrsa backups.
+  params:
+    name:
+      type: string
+      description: |
+        Name of the backup to be deleted. (list of all backups can be
+        acquired using 'list-backups' action)
+    all:
+      type: boolean
+      description: If set to 'true', all backups on the unit will be deleted.

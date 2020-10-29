@@ -7,7 +7,6 @@ import tarfile
 import shutil
 
 from datetime import datetime
-from typing import List
 
 from charms import layer
 from charms.reactive.relations import endpoint_from_name
@@ -32,20 +31,24 @@ hookenv._run_atstart()
 PKI_BACKUP = '/home/ubuntu/easyrsa_backup'
 
 
-def backup() -> None:
+def _ensure_backup_dir_exists():
     uid = pwd.getpwnam("ubuntu").pw_uid
     gid = grp.getgrnam("ubuntu").gr_gid
     try:
         os.mkdir(PKI_BACKUP, mode=0o700)
     except FileExistsError:
         pass
-
     os.chown(PKI_BACKUP, uid, gid)
+
     if not os.path.isdir(PKI_BACKUP):
         raise RuntimeError('Backup destination is not a directory.')
 
+
+def backup():
+    _ensure_backup_dir_exists()
+
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    backup_name = 'easy-rsa-{}.tar.gz'.format(timestamp)
+    backup_name = 'easyrsa-{}.tar.gz'.format(timestamp)
     backup_path = os.path.join(PKI_BACKUP, backup_name)
     with tarfile.open(backup_path, mode='w:gz') as tar:
         tar.add(os.path.join(easyrsa_directory, 'pki'), 'pki')
@@ -57,11 +60,11 @@ def backup() -> None:
     })
 
 
-def restore() -> None:
+def restore():
     pki_dir = os.path.join(easyrsa_directory, 'pki')
-    backup_name: str = function_get('name')
+    backup_name = function_get('name')
     if backup_name is None:
-        raise RuntimeError('Parameter \'name\' is required.')
+        raise RuntimeError("Parameter 'name' is required.")
 
     backup_path = os.path.join(PKI_BACKUP, backup_name)
 
@@ -96,7 +99,6 @@ def restore() -> None:
             'certificate_authority_serial': stream.read()})
 
     ca_cert = leader_get('certificate_authority')
-    print(ca_cert)
     tls = endpoint_from_name('client')
     tls.set_ca(ca_cert)
     for client in tls.all_requests:
@@ -107,8 +109,6 @@ def restore() -> None:
                                     "{}.key".format(client.common_name))
             with open(cert_file, 'r') as file:
                 cert = file.read()
-                print('writing cert to '
-                      '{}:\n{}'.format(client.common_name, cert))
             with open(key_file, 'r') as file:
                 key = file.read()
             client.set_cert(cert, key)
@@ -117,8 +117,8 @@ def restore() -> None:
             print("Cert not found for {}".format(client.common_name))
 
 
-def list_backups() -> None:
-    file_list: List[str] = []
+def list_backups():
+    file_list = []
 
     try:
         file_list = os.listdir(PKI_BACKUP)
@@ -135,14 +135,14 @@ def list_backups() -> None:
     function_set({'message': message})
 
 
-def delete_backup() -> None:
-    backup_name: str = function_get('name')
-    delete_all: bool = function_get('all')
+def delete_backup():
+    backup_name = function_get('name')
+    delete_all = function_get('all')
 
     if not delete_all:
         if backup_name is None:
-            raise RuntimeError('Parameter \'name\' is required if parameter '
-                               '\'all\' is False.')
+            raise RuntimeError("Parameter 'name' is required if parameter "
+                               "'all' is False.")
         delete_file = os.path.join(PKI_BACKUP, backup_name)
         try:
             os.remove(delete_file)
@@ -151,7 +151,6 @@ def delete_backup() -> None:
                                'exist'.format(backup_name))
     else:
         shutil.rmtree(PKI_BACKUP)
-        os.mkdir(PKI_BACKUP)
 
 
 ACTIONS = {'backup': backup,
@@ -161,7 +160,7 @@ ACTIONS = {'backup': backup,
            }
 
 
-def main(args: List) -> None:
+def main(args):
     action_name = os.path.basename(args.pop(0))
     try:
         action = ACTIONS[action_name]

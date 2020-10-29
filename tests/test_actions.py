@@ -26,7 +26,7 @@ class _ActionTestCase(TestCase):
 
     NAME = ''
 
-    def setUp(self, to_mock=None) -> None:
+    def setUp(self, to_mock=None):
         """
         Mock commonly used objects from actions.py module. Additional objects
         can be passed in for mocking in the form of a dict with format
@@ -71,7 +71,7 @@ class _ActionTestCase(TestCase):
                 mock_.start()
                 self.addCleanup(mock_.stop)
 
-    def assert_function_fail_msg(self, msg: str):
+    def assert_function_fail_msg(self, msg):
         """Shortcut for asserting error with default structure"""
         actions.function_fail.assert_called_with("Action {} failed: "
                                                  "{}".format(self.NAME, msg))
@@ -127,7 +127,7 @@ class BackupActionsTests(_ActionTestCase):
         mock_datetime.now = MagicMock(return_value=freeze_time)
         timestamp = freeze_time.strftime('%Y-%m-%d_%H-%M-%S')
         expected_path = os.path.join(actions.PKI_BACKUP,
-                                     'easy-rsa-{}.tar.gz'.format(timestamp))
+                                     'easyrsa-{}.tar.gz'.format(timestamp))
         expected_format = 'w:gz'
 
         self.call_action()
@@ -142,7 +142,7 @@ class BackupActionsTests(_ActionTestCase):
         mock_datetime.now = MagicMock(return_value=freeze_time)
         timestamp = freeze_time.strftime('%Y-%m-%d_%H-%M-%S')
         expected_path = os.path.join(actions.PKI_BACKUP,
-                                     'easy-rsa-{}.tar.gz'.format(timestamp))
+                                     'easyrsa-{}.tar.gz'.format(timestamp))
         local_unit = 'easyrsa/0'
         actions.local_unit.return_value = local_unit
         self.call_action()
@@ -187,9 +187,8 @@ class ListBackupTests(_ActionTestCase):
         actions.os.listdir.return_value = backups
         self.call_action()
 
-        expected_text = 'Available backup files:'
-        for file in backups:
-            expected_text += '\n{}'.format(file)
+        expected_text = "Available backup " \
+                        "files:\n{}".format("\n".join(backups))
 
         actions.function_set({'message': expected_text})
         actions.function_fail.assert_not_called()
@@ -239,8 +238,8 @@ class DeleteBackupTests(_ActionTestCase):
         """Name is required if we are not deleting all the backups"""
         with self.func_call_arguments(name=None, all_=False):
             self.call_action()
-            expected_err = 'Parameter \'name\' is required if parameter ' \
-                           '\'all\' is False.'
+            expected_err = "Parameter 'name' is required if parameter " \
+                           "'all' is False."
             self.assert_function_fail_msg(expected_err)
 
     def test_single_file_delete(self):
@@ -271,5 +270,4 @@ class DeleteBackupTests(_ActionTestCase):
 
             actions.os.remove.assert_not_called()
             actions.shutil.rmtree.assert_called_with(actions.PKI_BACKUP)
-            actions.os.mkdir.assert_called_with(actions.PKI_BACKUP)
             actions.function_fail.assert_not_called()

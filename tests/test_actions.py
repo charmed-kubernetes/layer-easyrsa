@@ -113,7 +113,7 @@ class BackupActionsTests(_ActionTestCase):
         actions.function_fail.assert_not_called()
 
     def test_destination_not_dir(self):
-        """Fail if default backup destination exists but it's not a directory"""
+        """Fail if default backup destination exists but it's not a dir"""
         actions.os.path.isdir.return_value = False
         patch.object(actions.os, 'mkdir')
         patch.object(actions.os.path, 'isdir')
@@ -122,7 +122,7 @@ class BackupActionsTests(_ActionTestCase):
 
     @patch.object(actions, 'datetime')
     def test_backup_filename_format(self, mock_datetime):
-        """Test that backups are saved to the file with expected time-stamped name"""
+        """Test that backups are saved to the file with expected name"""
         freeze_time = datetime(2020, 1, 1)
         mock_datetime.now = MagicMock(return_value=freeze_time)
         timestamp = freeze_time.strftime('%Y-%m-%d_%H-%M-%S')

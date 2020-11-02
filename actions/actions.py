@@ -65,7 +65,7 @@ def _verify_backup(tarball):
     :return: None
     """
     members = set(tarball.getnames())
-    if members.issubset(TAR_STRUCTURE):
+    if not TAR_STRUCTURE.issubset(members):
         raise RuntimeError("Backup has unexpected content. Corrupted file?")
 
 

@@ -17,14 +17,34 @@ from contextlib import contextmanager
 from copy import copy
 
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call, mock_open
 
 from actions import actions
+
+
+def tls_certificate_relation(name, cert_type='client'):
+    mock_ = MagicMock()
+    mock_.common_name = name
+    mock_.cert_type = cert_type
+    return mock_
 
 
 class _ActionTestCase(TestCase):
 
     NAME = ''
+
+    def __init__(self, methodName='runTest'):
+        super(_ActionTestCase, self).__init__(methodName)
+        self._func_args = {}
+
+    def function_get_side_effect(self, arg):
+        """Simulate behavior of function_get.
+
+        This method, that is patched as a "side effect" in setUp(), emulates
+        behavior of function_get calls as if the action was invoked by using
+        `juju run-action unit_name action_name param1=value1 param2=value2`
+        """
+        return self._func_args.get(arg)
 
     def setUp(self, to_mock=None):
         """
@@ -63,6 +83,7 @@ class _ActionTestCase(TestCase):
             else:
                 default_mock[key] = value
         self.patch_all(default_mock)
+        actions.function_get.side_effect = self.function_get_side_effect
 
     def patch_all(self, to_patch):
         for object_, methods in to_patch.items():
@@ -208,16 +229,6 @@ class DeleteBackupTests(_ActionTestCase):
             actions.shutil: ['rmtree']
         }
         super(DeleteBackupTests, self).setUp(to_mock=additional_mocks)
-        actions.function_get.side_effect = self.function_get_side_effect
-
-    def function_get_side_effect(self, arg):
-        """Simulate behavior of function_get.
-
-        This method, that is patched as a "side effect" in setUp(), emulates
-        behavior of function_get calls as if the action was invoked by using
-        `juju run-action unit_name action_name param1=value1 param2=value2`
-        """
-        return self._func_args.get(arg)
 
     @contextmanager
     def func_call_arguments(self, name=None, all_=None):
@@ -264,10 +275,198 @@ class DeleteBackupTests(_ActionTestCase):
             self.assert_function_fail_msg(expected_err)
 
     def test_delete_all(self):
-        """Test deletioon of all backups aat once"""
+        """Test deletion of all backups aat once"""
         with self.func_call_arguments(all_=True):
             self.call_action()
 
             actions.os.remove.assert_not_called()
             actions.shutil.rmtree.assert_called_with(actions.PKI_BACKUP)
             actions.function_fail.assert_not_called()
+
+
+class RestoreActionTests(_ActionTestCase):
+
+    NAME = 'restore'
+
+    def __init__(self, methodName='runTest'):
+        super(RestoreActionTests, self).__init__(methodName)
+        self._func_args = {'name': None}
+        self.tar_ctx = MagicMock()
+        self.tar_obj = MagicMock()
+        self.mock_file_content = 'content'
+
+    def setUp(self, to_mock=None):
+        additional_mocks = {
+            actions: ['endpoint_from_name'],
+            actions.os.path: ['isfile'],
+            actions.tarfile.TarFile: ['getnames', 'extractall'],
+            actions.tarfile: ['open'],
+            actions.shutil: ['move', 'rmtree'],
+        }
+        super(RestoreActionTests, self).setUp(to_mock=additional_mocks)
+        # Mock contextmanager 'with tarfile.open() as tar:'
+        self.tar_obj.getnames.return_value = actions.TAR_STRUCTURE
+        self.tar_ctx.__enter__.return_value = self.tar_obj
+        actions.tarfile.open.return_value = self.tar_ctx
+
+    @contextmanager
+    def func_call_arguments(self, name=None):
+        """Set action parameters limited to the scope of this context.
+
+        This context manager allows you to set paramters of 'restore'
+        action with the scope of the context and then resets them to the
+        defaults.
+        """
+        default = copy(self._func_args)
+        try:
+            self._func_args = {'name': name}
+            yield
+        finally:
+            self._func_args = copy(default)
+
+    def test_require_name(self):
+        """Parameter 'name' is required by the 'restore' action"""
+        with self.func_call_arguments(name=None):
+            self.call_action()
+            self.assert_function_fail_msg("Parameter 'name' is required.")
+
+    def test_missing_backup_file(self):
+        """Fail if backup archive specified by 'name' is not foud"""
+        actions.os.path.isfile.return_value = False
+        backup_name = 'foo.tar.gz'
+        expected_error = "Backup with name '{}' does not exist. Use action " \
+                         "'list-backups' to list all available " \
+                         "backups".format(backup_name)
+        with self.func_call_arguments(name='foo.tar.gz'):
+            self.call_action()
+            self.assert_function_fail_msg(expected_error)
+
+    def test_bad_backup_structure(self):
+        """Fail if the backup archive does not have the expected structure"""
+        bad_tar_structure = {
+            'foo',
+            'bar',
+            'bad/structure',
+        }
+        self.tar_obj.getnames.return_value = bad_tar_structure
+        expected_error = "Backup has unexpected content. Corrupted file?"
+
+        with self.func_call_arguments(name='backup.tar.gz'):
+            self.call_action()
+            self.assert_function_fail_msg(expected_error)
+
+    def test_failed_extract_restore_original_pki(self):
+        """Test that original pki is restored in case of failure"""
+        pki_dst = os.path.join(actions.easyrsa_directory, 'pki')
+        safety_backup = os.path.join(actions.easyrsa_directory, 'pki_backup')
+        exception_message = 'Extraction failed'
+
+        self.tar_obj.extractall.side_effect = Exception(exception_message)
+        expected_error = 'Failed to extract backup bundle. ' \
+                         'Error: {}'.format(exception_message)
+
+        expected_move_calls = [
+            call(pki_dst, safety_backup),  # Original pki set aside
+            call(safety_backup, pki_dst)   # Original pki restored after failure
+        ]
+
+        with self.func_call_arguments(name='backup.tar.gz'):
+            self.call_action()
+            actions.shutil.move.assert_has_calls(expected_move_calls)
+            self.assert_function_fail_msg(expected_error)
+
+    @patch("builtins.open", new_callable=mock_open, read_data="mock_data")
+    def test_update_leader_values(self, mock_open_):
+        """Test that _update_leadership_data sets all required fields
+
+        Some of the pki information are stored in the database of the
+        leadership unit. These needs to be updated when new pki is imported
+        """
+        mock_data = "mock_data"
+        leader_set_calls = [
+            call({'certificate_authority': mock_data}),
+            call({'certificate_authority_key': mock_data}),
+            call({'certificate_authority_serial': mock_data}),
+            call({'client_certificate': mock_data}),
+            call({'client_key': mock_data}),
+        ]
+
+        actions._update_leadership_data('foo', 'bar', 'baz')
+        actions.leader_set.has_calls(leader_set_calls, any_order=True)
+
+    def test_restore_action(self):
+        """Test happy path of the 'restore' action
+
+        This UT tests that all the critical functions are called during the
+        successful execution of the 'restore' action. There are 2 happy path
+        scenarios:
+
+            * Certificate for the host is found in the backup and is
+              pushed to the host.
+            * Certificate for the host is NOT found in the backup and the
+              newly imported CA will create new cert which is the pushed
+              to the host
+                * Based on the original request from the host, this
+                  certificate can be either client or erver type.
+        """
+        mock_internal = {
+            actions: ['_verify_backup',
+                      '_replace_pki',
+                      '_update_leadership_data',
+                      'create_client_certificate',
+                      'create_server_certificate',
+                      ]
+        }
+        self.patch_all(mock_internal)
+
+        tls_provider = MagicMock()
+        tls_cert_relation = tls_certificate_relation('tls_client', 'client')
+        tls_provider.all_requests = [tls_cert_relation]
+        actions.endpoint_from_name.return_value = tls_provider
+
+        # Update certificate from backup
+        # builtin 'open()' function is mocked, which acts as if the file was
+        # found in the backup
+        with patch('builtins.open', new_callable=mock_open, read_data='data'):
+            with self.func_call_arguments(name='backup.tar.gz'):
+                self.call_action()
+
+                actions._verify_backup.assert_called()
+                actions._replace_pki.assert_called()
+                actions._update_leadership_data.assert_called()
+                tls_provider.set_ca.assert_called()
+                tls_provider.set_client_cert.assert_called()
+                tls_cert_relation.set_cert.assert_called()
+
+        # Generate client certificate for host missing in backup
+        # builtin 'open()' function will raise FileNotFoundError, which acts
+        # as if the file was not found in the backup
+        with patch('builtins.open', new_callable=mock_open, read_data='data') as mock_file:
+            mock_file.side_effect = FileNotFoundError()
+            with self.func_call_arguments(name='backup.tar.gz'):
+                self.call_action()
+
+                actions._verify_backup.assert_called()
+                actions._replace_pki.assert_called()
+                actions._update_leadership_data.assert_called()
+                tls_provider.set_ca.assert_called()
+                tls_provider.set_client_cert.assert_called()
+                actions.create_client_certificate.assert_called()
+                tls_cert_relation.set_cert.assert_called()
+
+        # Generate server certificate for host missing in backup
+        tls_server_relation = tls_certificate_relation('tls_server',
+                                                       'server')
+        tls_provider.all_requests = [tls_server_relation]
+        with patch('builtins.open', new_callable=mock_open, read_data='data') as mock_file:
+            mock_file.side_effect = FileNotFoundError()
+            with self.func_call_arguments(name='backup.tar.gz'):
+                self.call_action()
+
+                actions._verify_backup.assert_called()
+                actions._replace_pki.assert_called()
+                actions._update_leadership_data.assert_called()
+                tls_provider.set_ca.assert_called()
+                tls_provider.set_client_cert.assert_called()
+                actions.create_server_certificate.assert_called()
+                tls_cert_relation.set_cert.assert_called()

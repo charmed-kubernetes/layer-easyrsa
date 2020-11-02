@@ -157,6 +157,7 @@ def restore():
 
         * Selected backup is scanned and verified
         * Contents of the backup are unpacked into <cahrm_dir>/EasyRSA/pki
+        * Data that are stored in the local database are updated
         * All units that have relation with this easyrsa unit will be notified
           about the certificate changes.
     """

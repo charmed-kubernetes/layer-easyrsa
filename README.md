@@ -27,11 +27,12 @@ deployed then see file `actions.yaml`.
 ### Create Backups
 
 Use juju action `backup` to capture current snapshot of the easyrsa pki. The 
-backup archive is stored on the unit and can be retrieved using `juju scp`
+backup file is stored on the unit and can be retrieved using `juju scp`
 command. Destination where all the backups are stored is 
 `/home/ubuntu/easyrsa_backup` and every backup file follows naming convention
-`easyrsa-YYYY-MM-DD_HH-MM-SS.tar.gz`. For convenience, the exact `juju scp`
-command to download the backup you just created is part of the action's output.
+`easyrsa-YYYY-MM-DD_HH-MM-SS.tar.gz`.  For convenience, the output of the
+`backup` action will share the exact `juju scp` command to download the created
+backup file.
 
 Example:
 
@@ -39,11 +40,11 @@ Example:
 
 ### List Backups
 
-Use juju action `list-backups` to list all available backup archives on the
+Use juju action `list-backups` to list all available backup files on the
 unit. These names can be used either directly as a parameters for the
-`restore` and `delete-backup` actions or to download these backup archives from
-the unit, using `juju scp`. The backup file names are relative to the directory
-`/home/ubuntu/easyrsa_backup/`, so, for example, to download backup named 
+`restore` and `delete-backup` actions or as part of a `juju scp` command to
+download the backup files. Backup file names are relative to the directory
+`/home/ubuntu/easyrsa_backup/`. For example, to download a backup named 
 `easyrsa-2020-06-10_16-37-54.tar.gz`, corresponding `juju scp` command would
 be:
 
@@ -51,8 +52,8 @@ be:
 
 ### Delete Backups
 
-To delete backup stored on the unit, simply run action `delete-backup` with
-parameter `name=<backup_name>`. List of all available backups can be
+To delete a backup file stored on the unit, simply run action `delete-backup`
+with parameter `name=<backup_name>`. List of all available backups can be
 obtained by running action `list-backups`. To remove all the backups from the
 unit, you can specify parameter `all=true`.
 
@@ -67,7 +68,7 @@ Remove all backups example:
 
 ### Restore Backups
 
-To restore easyrsa backup, run `restore` action. This action takes one
+To restore an easyrsa backup, run `restore` action. This action takes one
 parameter `name` that specifies which backup file should be restored. List of
 all available backups can be obtained by running action `list-backups`.
 
@@ -86,6 +87,6 @@ Example:
   units.
   
 > **Known Issue**: It has been observed that the `kubernetes-master` units
-  need to be restarted after the certificate change. They may settle into the
-  `active/idle` state but all new pods will hang in the `pending` state.
+  need to be restarted after the certificate change. These units may settle in
+   the `active/idle` state but all new pods will hang in the `pending` state.
 

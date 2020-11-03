@@ -275,7 +275,7 @@ class DeleteBackupTests(_ActionTestCase):
             self.assert_function_fail_msg(expected_err)
 
     def test_delete_all(self):
-        """Test deletion of all backups aat once"""
+        """Test deletion of all backups at once"""
         with self.func_call_arguments(all_=True):
             self.call_action()
 

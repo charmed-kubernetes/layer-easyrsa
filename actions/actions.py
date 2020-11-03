@@ -57,14 +57,13 @@ def _ensure_backup_dir_exists():
         raise RuntimeError('Backup destination is not a directory.')
 
 
-def _verify_backup(tarball):
+def _verify_backup(pki_tar):
     """
     Verify that backup archive contains expected files
 
-    :param tarball: Tarfile object containing easyrsa backup
-    :return: None
+    :param pki_tar: Tarfile object containing easyrsa backup
     """
-    members = set(tarball.getnames())
+    members = set(pki_tar.getnames())
     if not TAR_STRUCTURE.issubset(members):
         raise RuntimeError("Backup has unexpected content. Corrupted file?")
 
@@ -73,7 +72,7 @@ def _replace_pki(pki_tar, pki_dir):
     """
     Safely replace easyrsa pki directory.
 
-    If there are any problems during the extraction of the backup. Original
+    If there are any problems during the extraction of the backup, original
     pki directory will be brought back and error raised.
 
     :param pki_tar: Tarfile object containing easyrsa backup
@@ -132,15 +131,14 @@ def backup():
 
     Currently deployed pki is packed into tarball and stored in the
     backups directory.
-    :return:
     """
     _ensure_backup_dir_exists()
 
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     backup_name = 'easyrsa-{}.tar.gz'.format(timestamp)
     backup_path = os.path.join(PKI_BACKUP, backup_name)
-    with tarfile.open(backup_path, mode='w:gz') as tar:
-        tar.add(os.path.join(easyrsa_directory, 'pki'), 'pki')
+    with tarfile.open(backup_path, mode='w:gz') as pki_tar:
+        pki_tar.add(os.path.join(easyrsa_directory, 'pki'), 'pki')
 
     function_set({
         'command': 'juju scp {}:{} .'.format(local_unit(), backup_path),
@@ -174,9 +172,9 @@ def restore():
                            "'list-backups' to list all available "
                            "backups".format(backup_name))
 
-    with tarfile.open(backup_path, 'r:gz') as tar:
-        _verify_backup(tar)
-        _replace_pki(tar, pki_dir)
+    with tarfile.open(backup_path, 'r:gz') as pki_tar:
+        _verify_backup(pki_tar)
+        _replace_pki(pki_tar, pki_dir)
 
     cert_dir = os.path.join(pki_dir, 'issued')
     key_dir = os.path.join(pki_dir, 'private')

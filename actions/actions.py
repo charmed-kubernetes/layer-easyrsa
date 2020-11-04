@@ -44,6 +44,31 @@ TAR_STRUCTURE = {'pki',
                  }
 
 
+def _check_path_traversal(path_, parent_dir):
+    """Check that 'path_' does not lie outside of the 'parent_dir'.
+
+    This function takes into account possible '../' in 'path_' and also
+    any symlinks that could point somewhere outside the expected 'parent_dir'
+
+    NOTE(mkalcok): This implementation could be improved by using
+                   'os.path.commonpath()'. However it's available only in
+                    py35+.
+
+    :param path_: Path to be tested
+    :param parent_dir: Directory in which the 'path_' must lie
+    :raises: RuntimeError if 'path_' is outside of the 'parent_dir'
+    """
+    full_path = os.path.realpath(path_)
+    if not parent_dir.endswith('/'):
+        parent_dir += '/'
+
+    if os.path.commonprefix([parent_dir, full_path]) != parent_dir:
+        err_msg = "Path traversal detected. '{}' tries to travers out " \
+                  "of {}".format(full_path, parent_dir)
+        log(err_msg, hookenv.CRITICAL)
+        raise RuntimeError(err_msg)
+
+
 def _ensure_backup_dir_exists():
     """Ensure that backup directory exists with proper ownership"""
     uid = pwd.getpwnam("ubuntu").pw_uid
@@ -68,9 +93,17 @@ def _verify_backup(pki_tar):
     """
     log("Verifying backup", hookenv.DEBUG)
     members = set(pki_tar.getnames())
+
+    # Check that backup contains all the expected/required files
     if not TAR_STRUCTURE.issubset(members):
         raise RuntimeError("Backup has unexpected content. Corrupted file?")
-    log("Backup content - OK", hookenv.DEBUG)
+    log("Check expected files - OK", hookenv.DEBUG)
+
+    # Check for path traversal attempts in tar file
+    pki_dir = os.path.join(easyrsa_directory, 'pki')
+    for path_ in members:
+        destination = os.path.join(pki_dir, path_)
+        _check_path_traversal(destination, pki_dir)
 
 
 def _replace_pki(pki_tar, pki_dir):
@@ -231,7 +264,8 @@ def restore():
             with open(key_file, 'r') as file:
                 key = file.read()
             log("Sending certificate for '{}' to unit"
-                "'{}'".format(client.common_name, client.unit_name), hookenv.INFO)
+                "'{}'".format(client.common_name, client.unit_name),
+                hookenv.INFO)
             log(cert, hookenv.DEBUG)
             client.set_cert(cert, key)
 
@@ -250,7 +284,8 @@ def restore():
                 raise RuntimeError('Unrecognized certificate request type '
                                    '"{}".'.format(client.cert_type))
             log("Sending certificate for '{}' to unit"
-                "'{}'".format(client.common_name, client.unit_name), hookenv.INFO)
+                "'{}'".format(client.common_name, client.unit_name),
+                hookenv.INFO)
             log(cert, hookenv.DEBUG)
             client.set_cert(cert, key)
 
@@ -287,6 +322,7 @@ def delete_backup():
                                "'all' is False.")
         log("Removing backup '{}'".format(backup_name), hookenv.INFO)
         delete_file = os.path.join(PKI_BACKUP, backup_name)
+        _check_path_traversal(delete_file, PKI_BACKUP)
         try:
             os.remove(delete_file)
         except FileNotFoundError:

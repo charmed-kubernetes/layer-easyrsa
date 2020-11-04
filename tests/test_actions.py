@@ -226,9 +226,13 @@ class DeleteBackupTests(_ActionTestCase):
     def setUp(self, to_mock=None):
         additional_mocks = {
             actions.os: ['remove', 'mkdir'],
-            actions.shutil: ['rmtree']
+            actions.shutil: ['rmtree'],
+            actions.os.path: ['realpath'],
         }
         super(DeleteBackupTests, self).setUp(to_mock=additional_mocks)
+
+        actions.os.path.realpath.return_value = os.path.join(
+            '/home', 'ubuntu', 'easyrsa_backup', 'foo.tar.gz')
 
     @contextmanager
     def func_call_arguments(self, name=None, all_=None):
@@ -270,8 +274,22 @@ class DeleteBackupTests(_ActionTestCase):
 
         with self.func_call_arguments(name=backup_name):
             self.call_action()
-            expected_err = 'Backup file "{}" does not ' \
-                           'exist'.format(backup_name)
+            expected_err = "Backup file '{}' does not " \
+                           "exist".format(backup_name)
+            self.assert_function_fail_msg(expected_err)
+
+    def test_delete_path_traversal(self):
+        """Test that attempt at path traversal fails"""
+        backup_name = '../../../bin/bash'
+        resolved_path = '/bin/bash'
+        expected_parent_dir = actions.PKI_BACKUP + '/'
+        actions.os.path.realpath.return_value = resolved_path
+
+        with self.func_call_arguments(name=backup_name):
+            self.call_action()
+            expected_err = "Path traversal detected. '{}' tries to travers" \
+                           " out of {}".format(resolved_path,
+                                               expected_parent_dir)
             self.assert_function_fail_msg(expected_err)
 
     def test_delete_all(self):
@@ -298,7 +316,7 @@ class RestoreActionTests(_ActionTestCase):
     def setUp(self, to_mock=None):
         additional_mocks = {
             actions: ['endpoint_from_name'],
-            actions.os.path: ['isfile'],
+            actions.os.path: ['isfile', 'realpath'],
             actions.tarfile.TarFile: ['getnames', 'extractall'],
             actions.tarfile: ['open'],
             actions.shutil: ['move', 'rmtree'],
@@ -308,6 +326,9 @@ class RestoreActionTests(_ActionTestCase):
         self.tar_obj.getnames.return_value = actions.TAR_STRUCTURE
         self.tar_ctx.__enter__.return_value = self.tar_obj
         actions.tarfile.open.return_value = self.tar_ctx
+
+        actions.os.path.realpath.return_value = os.path.join(
+            actions.easyrsa_directory, 'pki', 'foo')
 
     @contextmanager
     def func_call_arguments(self, name=None):
@@ -367,12 +388,28 @@ class RestoreActionTests(_ActionTestCase):
 
         expected_move_calls = [
             call(pki_dst, safety_backup),  # Original pki set aside
-            call(safety_backup, pki_dst)   # Original pki restored after failure
+            call(safety_backup, pki_dst)   # Original pki restored
         ]
 
         with self.func_call_arguments(name='backup.tar.gz'):
             self.call_action()
             actions.shutil.move.assert_has_calls(expected_move_calls)
+            self.assert_function_fail_msg(expected_error)
+
+    def test_path_traversal_in_backup_file(self):
+        """Test that relative paths in tarball can't traverse outside
+        expected parent dir"""
+        malicious_tarball = copy(actions.TAR_STRUCTURE)
+        malicious_tarball.add('../../../bin/bash')
+        resolved_malicious_path = '/bin/bash'
+        actions.os.path.realpath.return_value = resolved_malicious_path
+        expected_error = "Path traversal detected. " \
+                         "'{}' tries to travers out of charm_dir/" \
+                         "EasyRSA/pki/".format(resolved_malicious_path)
+        self.tar_obj.getnames.return_value = malicious_tarball
+
+        with self.func_call_arguments(name='backup.tar.gz'):
+            self.call_action()
             self.assert_function_fail_msg(expected_error)
 
     @patch("builtins.open", new_callable=mock_open, read_data="mock_data")
@@ -441,7 +478,8 @@ class RestoreActionTests(_ActionTestCase):
         # Generate client certificate for host missing in backup
         # builtin 'open()' function will raise FileNotFoundError, which acts
         # as if the file was not found in the backup
-        with patch('builtins.open', new_callable=mock_open, read_data='data') as mock_file:
+        with patch('builtins.open', new_callable=mock_open, read_data='data') \
+                as mock_file:
             mock_file.side_effect = FileNotFoundError()
             with self.func_call_arguments(name='backup.tar.gz'):
                 self.call_action()
@@ -458,7 +496,8 @@ class RestoreActionTests(_ActionTestCase):
         tls_server_relation = tls_certificate_relation('tls_server',
                                                        'server')
         tls_provider.all_requests = [tls_server_relation]
-        with patch('builtins.open', new_callable=mock_open, read_data='data') as mock_file:
+        with patch('builtins.open', new_callable=mock_open, read_data='data') \
+                as mock_file:
             mock_file.side_effect = FileNotFoundError()
             with self.func_call_arguments(name='backup.tar.gz'):
                 self.call_action()

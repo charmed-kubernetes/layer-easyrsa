@@ -16,6 +16,7 @@ from charmhelpers.core.hookenv import (
     function_set,
     function_fail,
     local_unit,
+    log,
     leader_set,
     leader_get,
 )
@@ -54,6 +55,8 @@ def _ensure_backup_dir_exists():
     os.chown(PKI_BACKUP, uid, gid)
 
     if not os.path.isdir(PKI_BACKUP):
+        log("Backup destination '{}' is not a directory".format(PKI_BACKUP),
+            hookenv.ERROR)
         raise RuntimeError('Backup destination is not a directory.')
 
 
@@ -63,9 +66,11 @@ def _verify_backup(pki_tar):
 
     :param pki_tar: Tarfile object containing easyrsa backup
     """
+    log("Verifying backup", hookenv.DEBUG)
     members = set(pki_tar.getnames())
     if not TAR_STRUCTURE.issubset(members):
         raise RuntimeError("Backup has unexpected content. Corrupted file?")
+    log("Backup content - OK", hookenv.DEBUG)
 
 
 def _replace_pki(pki_tar, pki_dir):
@@ -82,8 +87,12 @@ def _replace_pki(pki_tar, pki_dir):
     safety_backup = os.path.join(easyrsa_directory, 'pki_backup')
     shutil.move(pki_dir, safety_backup)
     try:
+        log("Extracting pki from backup", hookenv.DEBUG)
         pki_tar.extractall(easyrsa_directory)
     except Exception as exc:
+        log("pki extraction failed: {}".format(exc),
+            hookenv.WARNING)
+        log("Restoring original pki.", hookenv.INFO)
         shutil.move(safety_backup, pki_dir)
         raise RuntimeError('Failed to extract backup bundle. '
                            'Error: {}'.format(exc))
@@ -107,21 +116,35 @@ def _update_leadership_data(pki_dir, cert_dir, key_dir):
     global_client_key = os.path.join(key_dir, 'client.key')
 
     with open(ca_cert, 'r') as stream:
+        data = stream.read()
+        log("Updating CA certificate in leader's database",
+            hookenv.INFO)
+        log("CA certificate:\n{}".format(data), hookenv.DEBUG)
         leader_set({
-            'certificate_authority': stream.read()})
+            'certificate_authority': data})
 
     with open(ca_key, 'r') as stream:
+        log("Updating CA key in leader's database",
+            hookenv.INFO)
         leader_set({
             'certificate_authority_key': stream.read()})
 
     with open(serial_file, 'r') as stream:
+        log("Updating CA serial in leader's database",
+            hookenv.INFO)
         leader_set({
             'certificate_authority_serial': stream.read()})
 
     with open(global_client_cert) as stream:
-        leader_set({'client_certificate': stream.read()})
+        data = stream.read()
+        log("Updating (legacy) global client certificate in leader's database",
+            hookenv.INFO)
+        log(data, hookenv.DEBUG)
+        leader_set({'client_certificate': data})
 
     with open(global_client_key) as stream:
+        log("Updating (legacy) global client key in leader's database",
+            hookenv.INFO)
         leader_set({'client_key': stream.read()})
 
 
@@ -140,6 +163,7 @@ def backup():
     with tarfile.open(backup_path, mode='w:gz') as pki_tar:
         pki_tar.add(os.path.join(easyrsa_directory, 'pki'), 'pki')
 
+    log("Backup created and saved to '{}'".format(backup_path), hookenv.DEBUG)
     function_set({
         'command': 'juju scp {}:{} .'.format(local_unit(), backup_path),
         'message': 'Backup archive created successfully. Use the juju scp '
@@ -165,9 +189,13 @@ def restore():
     if backup_name is None:
         raise RuntimeError("Parameter 'name' is required.")
 
+    log("Restoring pki from backup file {}".format(backup_name), hookenv.INFO)
+
     backup_path = os.path.join(PKI_BACKUP, backup_name)
 
     if not os.path.isfile(backup_path):
+        log("Backup file '{}' does not exists.".format(backup_path),
+            hookenv.ERROR)
         raise RuntimeError("Backup with name '{}' does not exist. Use action "
                            "'list-backups' to list all available "
                            "backups".format(backup_name))
@@ -179,11 +207,17 @@ def restore():
     cert_dir = os.path.join(pki_dir, 'issued')
     key_dir = os.path.join(pki_dir, 'private')
 
+    # Update CA and global client data stored in the local leader's database
+    # NOTE(mkalcok): Easyrsa does not really support HA mode, so it's usually
+    #                run as a single unit/model
     _update_leadership_data(pki_dir, cert_dir, key_dir)
 
     ca_cert = leader_get('certificate_authority')
     tls = endpoint_from_name('client')
+    log("Sending CA certificate to all related units", hookenv.INFO)
     tls.set_ca(ca_cert)
+    log("Sending global client certificate and key to all related units",
+        hookenv.INFO)
     tls.set_client_cert(leader_get('client_certificate'),
                         leader_get('client_key'))
     for client in tls.all_requests:
@@ -196,22 +230,29 @@ def restore():
                 cert = file.read()
             with open(key_file, 'r') as file:
                 key = file.read()
+            log("Sending certificate for '{}' to unit"
+                "'{}'".format(client.common_name, client.unit_name), hookenv.INFO)
+            log(cert, hookenv.DEBUG)
             client.set_cert(cert, key)
 
         except FileNotFoundError:
+            log("Certificate for '{}' not found in backup. "
+                "Generating new one.", hookenv.INFO)
             if client.cert_type == 'client':
                 cert, key = create_client_certificate(client.common_name)
-                client.set_cert(cert, key)
             elif client.cert_type == 'server':
                 cert, key = create_server_certificate(client.common_name,
                                                       client.sans,
                                                       client.common_name)
-                client.set_cert(cert, key)
             else:
                 # This use case should not really happen as easyrsa charm
                 # does not support Application type certificates
-                function_fail('Unrecognized certificate request type '
-                              '"{}".'.format(client.cert_type))
+                raise RuntimeError('Unrecognized certificate request type '
+                                   '"{}".'.format(client.cert_type))
+            log("Sending certificate for '{}' to unit"
+                "'{}'".format(client.common_name, client.unit_name), hookenv.INFO)
+            log(cert, hookenv.DEBUG)
+            client.set_cert(cert, key)
 
     hookenv._run_atexit()
 
@@ -244,13 +285,16 @@ def delete_backup():
         if backup_name is None:
             raise RuntimeError("Parameter 'name' is required if parameter "
                                "'all' is False.")
+        log("Removing backup '{}'".format(backup_name), hookenv.INFO)
         delete_file = os.path.join(PKI_BACKUP, backup_name)
         try:
             os.remove(delete_file)
         except FileNotFoundError:
-            raise RuntimeError('Backup file "{}" does not '
-                               'exist'.format(backup_name))
+            err_msg = "Backup file '{}' does not exist".format(backup_name)
+            log(err_msg, hookenv.ERROR)
+            raise RuntimeError(err_msg)
     else:
+        log("Removing all backup files.", hookenv.INFO)
         shutil.rmtree(PKI_BACKUP)
 
 
@@ -271,6 +315,7 @@ def main(args):
         return
     else:
         try:
+            log("Running action '{}'.".format(action_name))
             action()
         except Exception as e:
             function_fail("Action {} failed: {}".format(action_name, str(e)))

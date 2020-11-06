@@ -66,7 +66,7 @@ def _check_path_traversal(path_, parent_dir):
     if os.path.commonprefix([parent_dir, full_path]) != parent_dir:
         err_msg = "Path traversal detected. '{}' tries to travers out " \
                   "of {}".format(full_path, parent_dir)
-        log(err_msg, hookenv.CRITICAL)
+        log(err_msg, hookenv.ERROR)
         raise RuntimeError(err_msg)
 
 

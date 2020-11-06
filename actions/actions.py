@@ -59,6 +59,7 @@ def _check_path_traversal(path_, parent_dir):
     :raises: RuntimeError if 'path_' is outside of the 'parent_dir'
     """
     full_path = os.path.realpath(path_)
+    parent_dir = os.path.realpath(parent_dir)
     if not parent_dir.endswith('/'):
         parent_dir += '/'
 

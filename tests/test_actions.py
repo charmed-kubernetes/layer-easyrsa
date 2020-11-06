@@ -231,8 +231,11 @@ class DeleteBackupTests(_ActionTestCase):
         }
         super(DeleteBackupTests, self).setUp(to_mock=additional_mocks)
 
-        actions.os.path.realpath.return_value = os.path.join(
-            '/home', 'ubuntu', 'easyrsa_backup', 'foo.tar.gz')
+        realpaths = [
+            os.path.join('/home', 'ubuntu', 'easyrsa_backup', 'foo.tar.gz'),
+            os.path.join('/home', 'ubuntu', 'easyrsa_backup'),
+            ]
+        actions.os.path.realpath.side_effect = realpaths
 
     @contextmanager
     def func_call_arguments(self, name=None, all_=None):
@@ -283,7 +286,11 @@ class DeleteBackupTests(_ActionTestCase):
         backup_name = '../../../bin/bash'
         resolved_path = '/bin/bash'
         expected_parent_dir = actions.PKI_BACKUP + '/'
-        actions.os.path.realpath.return_value = resolved_path
+        realpaths = [
+            resolved_path,
+            expected_parent_dir,
+        ]
+        actions.os.path.realpath.side_effect = realpaths
 
         with self.func_call_arguments(name=backup_name):
             self.call_action()
@@ -327,8 +334,11 @@ class RestoreActionTests(_ActionTestCase):
         self.tar_ctx.__enter__.return_value = self.tar_obj
         actions.tarfile.open.return_value = self.tar_ctx
 
-        actions.os.path.realpath.return_value = os.path.join(
-            actions.easyrsa_directory, 'pki', 'foo')
+        realpaths = [
+            os.path.join(actions.easyrsa_directory, 'pki', 'foo'),
+            os.path.join(actions.easyrsa_directory, 'pki'),
+        ]
+        actions.os.path.realpath.side_effect = realpaths
 
     @contextmanager
     def func_call_arguments(self, name=None):
@@ -376,7 +386,8 @@ class RestoreActionTests(_ActionTestCase):
             self.call_action()
             self.assert_function_fail_msg(expected_error)
 
-    def test_failed_extract_restore_original_pki(self):
+    @patch.object(actions, '_check_path_traversal')
+    def test_failed_extract_restore_original_pki(self, _):
         """Test that original pki is restored in case of failure"""
         pki_dst = os.path.join(actions.easyrsa_directory, 'pki')
         safety_backup = os.path.join(actions.easyrsa_directory, 'pki_backup')
@@ -402,7 +413,11 @@ class RestoreActionTests(_ActionTestCase):
         malicious_tarball = copy(actions.TAR_STRUCTURE)
         malicious_tarball.add('../../../bin/bash')
         resolved_malicious_path = '/bin/bash'
-        actions.os.path.realpath.return_value = resolved_malicious_path
+        realpaths = [
+            resolved_malicious_path,
+            os.path.join(actions.easyrsa_directory, 'pki'),
+        ]
+        actions.os.path.realpath.side_effect = realpaths
         expected_error = "Path traversal detected. " \
                          "'{}' tries to travers out of charm_dir/" \
                          "EasyRSA/pki/".format(resolved_malicious_path)

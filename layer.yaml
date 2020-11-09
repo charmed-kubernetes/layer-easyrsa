@@ -10,5 +10,8 @@ options:
       - openssl
 repo: http://github.com/juju-solutions/layer-easyrsa.git
 exclude:
-  - tests/10-deploy.py
-  - tests/tests.yaml
+  - .tox
+  - __pycache__
+  - tests
+  - conftest.py
+  - tox.ini

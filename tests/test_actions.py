@@ -407,6 +407,19 @@ class RestoreActionTests(_ActionTestCase):
             actions.shutil.move.assert_has_calls(expected_move_calls)
             self.assert_function_fail_msg(expected_error)
 
+    def test_replace_pki_cleans_up(self):
+        """Test that `_replace_pki` function cleans up safety backup."""
+        safety_backup = os.path.join(actions.easyrsa_directory, 'pki_backup')
+        pki_tar = MagicMock()
+        pki_dir = "/tmp/pki"
+
+        actions._replace_pki(pki_tar, pki_dir)
+
+        # Test that `_replace_pki` safely unpacks pki backup.
+        actions.shutil.move.assert_called_once_with(pki_dir, safety_backup)
+        pki_tar.extractall.assert_called_once_with(actions.easyrsa_directory)
+        actions.shutil.rmtree.assert_called_once_with(safety_backup)
+
     def test_path_traversal_in_backup_file(self):
         """Test that relative paths in tarball can't traverse outside
         expected parent dir"""
@@ -446,20 +459,11 @@ class RestoreActionTests(_ActionTestCase):
         actions._update_leadership_data('foo', 'bar', 'baz')
         actions.leader_set.has_calls(leader_set_calls, any_order=True)
 
-    def test_restore_action(self):
-        """Test happy path of the 'restore' action
+    def test_restore_action_all_certs_found(self):
+        """Test 'restore' action without generating new certs.
 
-        This UT tests that all the critical functions are called during the
-        successful execution of the 'restore' action. There are 2 happy path
-        scenarios:
-
-            * Certificate for the host is found in the backup and is
-              pushed to the host.
-            * Certificate for the host is NOT found in the backup and the
-              newly imported CA will create new cert which is the pushed
-              to the host
-                * Based on the original request from the host, this
-                  certificate can be either client or erver type.
+        This scenario happens when certificates for all currently connected
+        charm units have valid certificate in the backup bundle.
         """
         mock_internal = {
             actions: ['_verify_backup',
@@ -490,7 +494,75 @@ class RestoreActionTests(_ActionTestCase):
                 tls_provider.set_client_cert.assert_called()
                 tls_cert_relation.set_cert.assert_called()
 
+    def test_restore_action_client_missing(self):
+        """Test 'restore' action when new client cert needs to be generated.
+
+        This scenario happens when client certificate for currently connected
+        unit is not found in the backup bundle.
+        """
+        mock_internal = {
+            actions: ['_verify_backup',
+                      '_replace_pki',
+                      '_update_leadership_data',
+                      'create_client_certificate',
+                      'create_server_certificate',
+                      ]
+        }
+        self.patch_all(mock_internal)
+
+        client_cert = MagicMock()
+        client_key = MagicMock()
+        tls_provider = MagicMock()
+        tls_cert_relation = tls_certificate_relation('tls_client', 'client')
+        tls_provider.all_requests = [tls_cert_relation]
+        actions.endpoint_from_name.return_value = tls_provider
+        actions.create_client_certificate.return_value = (client_cert,
+                                                          client_key)
+
         # Generate client certificate for host missing in backup
+        # builtin 'open()' function will raise FileNotFoundError, which acts
+        # as if the file was not found in the backup
+        with patch('builtins.open', new_callable=mock_open, read_data='data') \
+                as mock_file:
+            mock_file.side_effect = FileNotFoundError
+            with self.func_call_arguments(name='backup.tar.gz'):
+                self.call_action()
+
+                actions._verify_backup.assert_called()
+                actions._replace_pki.assert_called()
+                actions._update_leadership_data.assert_called()
+                tls_provider.set_ca.assert_called()
+                tls_provider.set_client_cert.assert_called()
+                actions.create_client_certificate.assert_called()
+                tls_cert_relation.set_cert.assert_called_once_with(client_cert,
+                                                                   client_key)
+
+    def test_restore_action_server_missing(self):
+        """Test 'restore' action when new server cert needs to be generated.
+
+        This scenario happens when server certificate for currently connected
+        unit is not found in the backup bundle.
+        """
+        mock_internal = {
+            actions: ['_verify_backup',
+                      '_replace_pki',
+                      '_update_leadership_data',
+                      'create_client_certificate',
+                      'create_server_certificate',
+                      ]
+        }
+        self.patch_all(mock_internal)
+
+        server_cert = MagicMock()
+        server_key = MagicMock()
+        tls_provider = MagicMock()
+        tls_cert_relation = tls_certificate_relation('tls_server', 'server')
+        tls_provider.all_requests = [tls_cert_relation]
+        actions.endpoint_from_name.return_value = tls_provider
+        actions.create_server_certificate.return_value = (server_cert,
+                                                          server_key)
+
+        # Generate server certificate for host missing in backup
         # builtin 'open()' function will raise FileNotFoundError, which acts
         # as if the file was not found in the backup
         with patch('builtins.open', new_callable=mock_open, read_data='data') \
@@ -504,23 +576,42 @@ class RestoreActionTests(_ActionTestCase):
                 actions._update_leadership_data.assert_called()
                 tls_provider.set_ca.assert_called()
                 tls_provider.set_client_cert.assert_called()
-                actions.create_client_certificate.assert_called()
-                tls_cert_relation.set_cert.assert_called()
+                actions.create_server_certificate.assert_called()
+                tls_cert_relation.set_cert.assert_called_once_with(server_cert,
+                                                                   server_key)
 
-        # Generate server certificate for host missing in backup
-        tls_server_relation = tls_certificate_relation('tls_server',
-                                                       'server')
-        tls_provider.all_requests = [tls_server_relation]
+    def test_restore_action_unknown_cert_type(self):
+        """Test 'restore' action fails when it wants to restore unknown cert.
+
+        This scenario should not really happen because easyrsa charm does not
+        support other than "client" or "server" type certificates but it's
+        covered just to be sure.
+        """
+        mock_internal = {
+            actions: ['_verify_backup',
+                      '_replace_pki',
+                      '_update_leadership_data',
+                      'create_client_certificate',
+                      'create_server_certificate',
+                      ]
+        }
+        self.patch_all(mock_internal)
+
+        tls_provider = MagicMock()
+        unsupported_cert_type = "application"
+        expected_msg = ('Unrecognized certificate request '
+                        'type "{}".'.format(unsupported_cert_type))
+        tls_cert_relation = tls_certificate_relation('tls_cert',
+                                                     unsupported_cert_type)
+        tls_provider.all_requests = [tls_cert_relation]
+        actions.endpoint_from_name.return_value = tls_provider
+
+        # Generate client certificate for host missing in backup with
+        # unsupported cert type.
         with patch('builtins.open', new_callable=mock_open, read_data='data') \
                 as mock_file:
-            mock_file.side_effect = FileNotFoundError()
+            mock_file.side_effect = FileNotFoundError
             with self.func_call_arguments(name='backup.tar.gz'):
                 self.call_action()
 
-                actions._verify_backup.assert_called()
-                actions._replace_pki.assert_called()
-                actions._update_leadership_data.assert_called()
-                tls_provider.set_ca.assert_called()
-                tls_provider.set_client_cert.assert_called()
-                actions.create_server_certificate.assert_called()
-                tls_cert_relation.set_cert.assert_called()
+            self.assert_function_fail_msg(expected_msg)

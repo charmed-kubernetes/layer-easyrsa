@@ -358,5 +358,5 @@ def main(args):
             function_fail("Action {} failed: {}".format(action_name, str(e)))
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     main(sys.argv)

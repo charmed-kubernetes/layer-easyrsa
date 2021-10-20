@@ -25,6 +25,7 @@ from actions import actions
 def tls_certificate_relation(name, cert_type='client'):
     mock_ = MagicMock()
     mock_.common_name = name
+    mock_.sans = "DNS:{}".format(name)
     mock_.cert_type = cert_type
     return mock_
 
@@ -36,6 +37,9 @@ class _ActionTestCase(TestCase):
     def __init__(self, methodName='runTest'):
         super(_ActionTestCase, self).__init__(methodName)
         self._func_args = {}
+        self.pki_dir = os.path.join(actions.easyrsa_directory, "pki")
+        self.cert_dir = os.path.join(self.pki_dir, "issued")
+        self.key_dir = os.path.join(self.pki_dir, "private")
 
     def function_get_side_effect(self, arg):
         """Simulate behavior of function_get.
@@ -85,6 +89,20 @@ class _ActionTestCase(TestCase):
         self.patch_all(default_mock)
         actions.function_get.side_effect = self.function_get_side_effect
 
+        # mock data in leader storage
+        self.ca_cert = "CA cert data"
+        self.ca_key = "CA key data"
+        self.client_cert = "client cert data"
+        self.client_key = "client key data"
+
+        self.leader_data = {
+            "certificate_authority": self.ca_cert,
+            "certificate_authority_key": self.ca_key,
+            "client_certificate": self.client_cert,
+            "client_key": self.client_key,
+        }
+        actions.leader_get.side_effect = self.leader_data.get
+
     def patch_all(self, to_patch):
         for object_, methods in to_patch.items():
             for method in methods:
@@ -130,7 +148,8 @@ class BackupActionsTests(_ActionTestCase):
         """Don't fail if destination directory for backups already exists"""
         actions.os.mkdir.side_effect = FileExistsError()
         self.call_action()
-        actions.os.mkdir.assert_called()
+        actions.os.mkdir.assert_called_once_with(actions.PKI_BACKUP,
+                                                 mode=0o700)
         actions.function_fail.assert_not_called()
 
     def test_destination_not_dir(self):
@@ -355,6 +374,22 @@ class RestoreActionTests(_ActionTestCase):
         finally:
             self._func_args = copy(default)
 
+    def assert_common_restore_actions(self, provider: MagicMock):
+        """Assert execution of expected common functions when doing `restore`.
+
+        :param provider: Mock of "provider" side of tls relation
+        :return: None
+        """
+        actions._verify_backup.assert_called_once_with(self.tar_obj)
+        actions._replace_pki.assert_called_once_with(self.tar_obj,
+                                                     self.pki_dir)
+        actions._update_leadership_data.assert_called_once_with(self.pki_dir,
+                                                                self.cert_dir,
+                                                                self.key_dir)
+        provider.set_ca.assert_called_once_with(self.ca_cert)
+        provider.set_client_cert.assert_called_once_with(self.client_cert,
+                                                         self.client_key)
+
     def test_require_name(self):
         """Parameter 'name' is required by the 'restore' action"""
         with self.func_call_arguments(name=None):
@@ -475,6 +510,10 @@ class RestoreActionTests(_ActionTestCase):
         }
         self.patch_all(mock_internal)
 
+        # new certificate data
+        cert_data = "found cert data"
+        key_data = "found key data"
+
         tls_provider = MagicMock()
         tls_cert_relation = tls_certificate_relation('tls_client', 'client')
         tls_provider.all_requests = [tls_cert_relation]
@@ -483,16 +522,22 @@ class RestoreActionTests(_ActionTestCase):
         # Update certificate from backup
         # builtin 'open()' function is mocked, which acts as if the file was
         # found in the backup
-        with patch('builtins.open', new_callable=mock_open, read_data='data'):
+        file_mock = mock_open()
+
+        cert_file_mock = mock_open(read_data=cert_data)
+        cert_file_handle = cert_file_mock()
+
+        key_file_mock = mock_open(read_data=key_data)
+        key_file_handle = key_file_mock()
+
+        file_mock.side_effect = (cert_file_handle, key_file_handle)
+
+        with patch('builtins.open', file_mock):
             with self.func_call_arguments(name='backup.tar.gz'):
                 self.call_action()
 
-                actions._verify_backup.assert_called()
-                actions._replace_pki.assert_called()
-                actions._update_leadership_data.assert_called()
-                tls_provider.set_ca.assert_called()
-                tls_provider.set_client_cert.assert_called()
-                tls_cert_relation.set_cert.assert_called()
+        self.assert_common_restore_actions(tls_provider)
+        tls_cert_relation.set_cert.assert_called_once_with(cert_data, key_data)
 
     def test_restore_action_client_missing(self):
         """Test 'restore' action when new client cert needs to be generated.
@@ -528,14 +573,11 @@ class RestoreActionTests(_ActionTestCase):
             with self.func_call_arguments(name='backup.tar.gz'):
                 self.call_action()
 
-                actions._verify_backup.assert_called()
-                actions._replace_pki.assert_called()
-                actions._update_leadership_data.assert_called()
-                tls_provider.set_ca.assert_called()
-                tls_provider.set_client_cert.assert_called()
-                actions.create_client_certificate.assert_called()
-                tls_cert_relation.set_cert.assert_called_once_with(client_cert,
-                                                                   client_key)
+        self.assert_common_restore_actions(tls_provider)
+        actions.create_client_certificate.assert_called_once_with(
+            tls_cert_relation.common_name)
+        tls_cert_relation.set_cert.assert_called_once_with(client_cert,
+                                                           client_key)
 
     def test_restore_action_server_missing(self):
         """Test 'restore' action when new server cert needs to be generated.
@@ -571,14 +613,13 @@ class RestoreActionTests(_ActionTestCase):
             with self.func_call_arguments(name='backup.tar.gz'):
                 self.call_action()
 
-                actions._verify_backup.assert_called()
-                actions._replace_pki.assert_called()
-                actions._update_leadership_data.assert_called()
-                tls_provider.set_ca.assert_called()
-                tls_provider.set_client_cert.assert_called()
-                actions.create_server_certificate.assert_called()
-                tls_cert_relation.set_cert.assert_called_once_with(server_cert,
-                                                                   server_key)
+        self.assert_common_restore_actions(tls_provider)
+        actions.create_server_certificate.assert_called_once_with(
+            tls_cert_relation.common_name,
+            tls_cert_relation.sans,
+            tls_cert_relation.common_name)
+        tls_cert_relation.set_cert.assert_called_once_with(server_cert,
+                                                           server_key)
 
     def test_restore_action_unknown_cert_type(self):
         """Test 'restore' action fails when it wants to restore unknown cert.

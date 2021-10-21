@@ -40,7 +40,7 @@ class TestInstall(TestCase):
         rmtree_patch = patch.object(easyrsa.shutil, "rmtree")
         self.rmtree_mock = rmtree_patch.start()
 
-        is_link_patch = patch.object(easyrsa.os.path, "islink")
+        is_link_patch = patch.object(easyrsa, "islink")
         self.is_link_mock = is_link_patch.start()
         self.is_link_mock.return_value = True
 

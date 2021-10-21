@@ -2,6 +2,7 @@ import ipaddress
 import os
 import shutil
 
+from os.path import islink
 from shlex import split
 from subprocess import check_call
 from subprocess import check_output
@@ -63,7 +64,7 @@ def install():
     # Save the version in the key/value store of the charm.
     unitdata.kv().set('easyrsa-version', version)
 
-    if os.path.islink(easyrsa_directory):
+    if islink(easyrsa_directory):
         check_call(split('rm -v {0}'.format(easyrsa_directory)))
 
     # Link the EasyRSA version directory to a common name.

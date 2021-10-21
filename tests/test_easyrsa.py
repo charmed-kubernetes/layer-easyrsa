@@ -1,5 +1,6 @@
 """Unit tests for easyrsa reactive layer."""
 from os import path
+from shlex import split
 from unittest import TestCase
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -16,17 +17,6 @@ class TestInstall(TestCase):
     EASYRSA_VERSION = "1.0"
 
     def setUp(self) -> None:
-        easyrsa_path = "{}/EasyRSA-{}".format(
-            easyrsa.charm_directory, self.EASYRSA_VERSION
-        )
-        self.easyrsa_link_cmd = [
-            "ln",
-            "-v",
-            "-s",
-            easyrsa_path,
-            easyrsa.easyrsa_directory,
-        ]
-
         # mock `os.stat` so that the install process passes by default
         self.resource_file_stat = MagicMock()
         self.resource_file_stat.st_size = 100000  # This filesize passes check
@@ -121,8 +111,15 @@ class TestInstall(TestCase):
 
     def test_install_easyrsa_generate_new_pki(self):
         """Test easyrsa installation which generates new PKI."""
-        generate_pki = ["./easyrsa", "--batch", "init-pki", "2>&1"]
-        rm_old_easyrsa = ["rm", "-v", easyrsa.easyrsa_directory]
+        generate_pki = split("./easyrsa --batch init-pki 2>&1")
+        rm_old_easyrsa = split("rm -v {}".format(easyrsa.easyrsa_directory))
+        link_easyrsa_version = split(
+            "ln -v -s {}/EasyRSA-{} {}".format(
+                easyrsa.charm_directory,
+                self.EASYRSA_VERSION,
+                easyrsa.easyrsa_directory,
+            )
+        )
         # PKI directory not present, new PKI must be generated
         self.is_dir_mock.return_value = False
 
@@ -133,7 +130,7 @@ class TestInstall(TestCase):
         self.check_call_mock.assert_has_calls(
             [
                 call(rm_old_easyrsa),
-                call(self.easyrsa_link_cmd),
+                call(link_easyrsa_version),
                 call(generate_pki),
             ]
         )
@@ -141,9 +138,16 @@ class TestInstall(TestCase):
 
     def test_install_easyrsa_copy_pki(self):
         """Test easyrsa installation which copies existing PKI structure."""
-        rm_old_easyrsa = ["rm", "-v", easyrsa.easyrsa_directory]
+        rm_old_easyrsa = split("rm -v {}".format(easyrsa.easyrsa_directory))
         new_pki_directory = path.join(easyrsa.easyrsa_directory, "pki")
         charm_pki_directory = path.join(easyrsa.charm_directory, "pki")
+        link_easyrsa_version = split(
+            "ln -v -s {}/EasyRSA-{} {}".format(
+                easyrsa.charm_directory,
+                self.EASYRSA_VERSION,
+                easyrsa.easyrsa_directory,
+            )
+        )
 
         self.is_dir_mock.side_effect = (True, False)
 
@@ -151,7 +155,7 @@ class TestInstall(TestCase):
 
         self.is_link_mock.assert_called_with(easyrsa.easyrsa_directory)
         self.check_call_mock.assert_has_calls(
-            [call(rm_old_easyrsa), call(self.easyrsa_link_cmd)]
+            [call(rm_old_easyrsa), call(link_easyrsa_version)]
         )
         self.copytree_mock.assert_called_with(
             charm_pki_directory, new_pki_directory, symlinks=True
@@ -349,7 +353,7 @@ class TestConfiguration(TestCase):
 class TestCertificateManagement(TestCase):
     """Tests creation and management of certificates using easyrsa."""
 
-    BUILD_CA = "./easyrsa --batch --req-cn={0} build-ca nopass 2>&1"
+    BUILD_CA = './easyrsa --batch "--req-cn={0}" build-ca nopass 2>&1'
     CA_FILE = "pki/ca.crt"
     KEY_FILE = "pki/private/ca.key"
     SERIAL_FILE = "pki/serial"
@@ -501,7 +505,7 @@ class TestCertificateManagement(TestCase):
         certificate authority data.
         """
         ca_ip = "10.0.0.1"
-        build_ca_cmd = self.BUILD_CA.format(ca_ip).split()
+        build_ca_cmd = split(self.BUILD_CA.format(ca_ip))
         easyrsa.hookenv.unit_public_ip.return_value = ca_ip
 
         expected_file_opens = [
@@ -718,10 +722,10 @@ class TestCertificateManagement(TestCase):
         self.is_file_mock.return_value = False
 
         # command to generate new server certificate
-        gen_cert_cmd = (
+        gen_cert_cmd = split(
             "./easyrsa --batch --req-cn={0} {1} build-server-full server "
             "nopass 2>&1".format(common_name, sans_arg)
-        ).split()
+        )
 
         # without supplying explicit name, default cert/key should
         # be named "server"
@@ -773,10 +777,10 @@ class TestCertificateManagement(TestCase):
         self.is_file_mock.return_value = False
 
         # command to generate new server certificate
-        gen_cert_cmd = (
+        gen_cert_cmd = split(
             "./easyrsa --batch --req-cn={0} {1} build-server-full {2} "
             "nopass 2>&1".format(common_name, sans_arg, server)
-        ).split()
+        )
 
         # expect usage of explicit host name for certificate files
         cert_file = "pki/issued/{}.crt".format(server)
@@ -827,11 +831,11 @@ class TestCertificateManagement(TestCase):
         self.is_file_mock.return_value = True
 
         # expected easyrsa commands
-        revoke_cmd = "./easyrsa --batch revoke {}".format(server).split()
-        gen_cert_cmd = (
+        revoke_cmd = split("./easyrsa --batch revoke {}".format(server))
+        gen_cert_cmd = split(
             "./easyrsa --batch --req-cn={0} {1} build-server-full {2} "
             "nopass 2>&1".format(common_name, sans_arg, server)
-        ).split()
+        )
         expected_easyrsa_calls = [
             call(revoke_cmd),
             call(gen_cert_cmd),
@@ -884,7 +888,7 @@ class TestCertificateManagement(TestCase):
         # Default name for client certificates is "client"
         cert_file = "pki/issued/client.crt"
         key_file = "pki/private/client.key"
-        generate_cert_cmd = "./easyrsa build-client-full client nopass".split()
+        generate_cert_cmd = split("./easyrsa build-client-full client nopass")
 
         # expected file openings
         expected_file_opens = [
@@ -921,9 +925,9 @@ class TestCertificateManagement(TestCase):
         client_name = "client1.local"
         cert_file = "pki/issued/{}.crt".format(client_name)
         key_file = "pki/private/{}.key".format(client_name)
-        generate_cert_cmd = (
+        generate_cert_cmd = split(
             "./easyrsa build-client-full {} nopass".format(client_name)
-        ).split()
+        )
 
         # expected file openings
         expected_file_opens = [
@@ -996,7 +1000,7 @@ class TestCertificateManagement(TestCase):
 
     def test_install_ca(self):
         """Install the CA as trusted authority in the systems."""
-        update_ca_call = ["update-ca-certificates"]
+        update_ca_call = split("update-ca-certificates")
         ca_name = "easyrsa_ca"
         ca_system_path = "/usr/local/share/ca-certificates/{0}.crt".format(
             ca_name

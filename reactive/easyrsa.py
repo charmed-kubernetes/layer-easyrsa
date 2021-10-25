@@ -2,8 +2,7 @@ import os
 import shutil
 
 from shlex import split
-from subprocess import check_call
-from subprocess import check_output
+from subprocess import check_call, check_output, CalledProcessError
 
 from charms.reactive import hook
 from charms.reactive import when
@@ -197,8 +196,18 @@ def create_certificate_authority():
         else:
             hookenv.log('Creating new CA')
             # The Common Name (CN) for a certificate
-            # must be an IP or hostname.
-            cn = hookenv.unit_public_ip()
+            # must be an IP or hostname. In case the IP of the unit is
+            # not ready, it will set the unit in blocked state without
+            # changing the charm flags to run again when the IP probably
+            # will be ready
+            try:
+                cn = hookenv.network_get('client')['ingress-addresses'][0]
+            except CalledProcessError as e:
+                msg = 'Public address not available yet'
+                hookenv.log(msg, hookenv.WARNING)
+                hookenv.log(e, hookenv.ERROR)
+                status.blocked(msg)
+                return
             # Create a self signed CA with the CN, stored pki/ca.crt
             build_ca = \
                 './easyrsa --batch "--req-cn={0}" build-ca nopass 2>&1'

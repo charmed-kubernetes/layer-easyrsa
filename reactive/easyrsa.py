@@ -198,14 +198,14 @@ def create_certificate_authority():
             # The Common Name (CN) for a certificate
             # must be an IP or hostname. In case the IP of the unit is
             # not ready, it will set the unit in blocked state without
-            # changing the charm flags to run again when the IP probably
-            # will be ready
+            # changing the charm flags to run again when the IP will
+            # probably be ready
             try:
                 cn = hookenv.network_get('client')['ingress-addresses'][0]
-            except CalledProcessError as e:
+            except (CalledProcessError, KeyError, IndexError) as e:
                 msg = 'Public address not available yet'
                 hookenv.log(msg, hookenv.WARNING)
-                hookenv.log(e, hookenv.ERROR)
+                hookenv.log(e, hookenv.WARNING)
                 status.blocked(msg)
                 return
             # Create a self signed CA with the CN, stored pki/ca.crt

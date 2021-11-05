@@ -1,6 +1,8 @@
+import ipaddress
 import os
 import shutil
 
+from os.path import islink
 from shlex import split
 from subprocess import check_call, check_output, CalledProcessError
 
@@ -61,7 +63,7 @@ def install():
     # Save the version in the key/value store of the charm.
     unitdata.kv().set('easyrsa-version', version)
 
-    if os.path.islink(easyrsa_directory):
+    if islink(easyrsa_directory):
         check_call(split('rm -v {0}'.format(easyrsa_directory)))
 
     # Link the EasyRSA version directory to a common name.
@@ -235,7 +237,7 @@ def create_certificate_authority():
 
     # Install the CA on this system as a trusted CA.
     install_ca(certificate_authority)
-    status.active('Certificiate Authority available')
+    status.active('Certificate Authority available')
 
     set_flag('easyrsa.certificate.authority.available')
 
@@ -380,8 +382,6 @@ def create_server_certificate(cn, san_list, name=None):
     common name, list of Subject Alternate Names, and the certificate name.'''
     if name is None:
         name = 'server'
-    server_cert = None
-    server_key = None
     with chdir(easyrsa_directory):
         # Create the path to the server certificate.
         cert_file = 'pki/issued/{0}.crt'.format(name)
@@ -423,8 +423,6 @@ def create_server_certificate(cn, san_list, name=None):
 
 def create_client_certificate(name='client'):
     '''Return a newly created client certificate and client key, by name.'''
-    client_cert = None
-    client_key = None
     with chdir(easyrsa_directory):
         # Create a path to the client certificate.
         cert_file = 'pki/issued/{0}.crt'.format(name)
@@ -458,8 +456,9 @@ def install_ca(certificate_authority):
     hookenv.log(message)
 
 
-def get_sans(address_list=[]):
+def get_sans(address_list=None):
     '''Return a string suitable for the easy-rsa subjectAltNames.'''
+    address_list = address_list or []
     sans = []
     for address in address_list:
         if _is_ip(address):
@@ -486,7 +485,6 @@ def get_version(path):
 
 def _is_ip(address):
     '''Return True if the address is an IP address, false otherwise.'''
-    import ipaddress
     try:
         # This method will raise a ValueError if argument is not an IP address.
         ipaddress.ip_address(address)

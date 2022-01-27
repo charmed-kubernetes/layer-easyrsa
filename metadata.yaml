@@ -3,6 +3,7 @@ summary: Delivers EasyRSA to create a Certificate Authority (CA).
 description: |
   This charm delivers the EasyRSA application and through Juju events creates
   a Certificate Authority (CA), server certificates, and client certificates.
+docs: https://discourse.charmhub.io/t/charm-etcd-docs-index/5592
 maintainers:
   - Tim Van Steenburgh <tim.van.steenburgh@canonical.com>
   - George Kraft <george.kraft@canonical.com>

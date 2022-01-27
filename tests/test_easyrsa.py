@@ -3,7 +3,7 @@ from os import path
 from shlex import split
 from unittest import TestCase
 from unittest.mock import MagicMock, call, mock_open, patch
-
+from subprocess import CalledProcessError
 from charmhelpers.core import unitdata
 
 from reactive import easyrsa
@@ -506,7 +506,8 @@ class TestCertificateManagement(TestCase):
         """
         ca_ip = "10.0.0.1"
         build_ca_cmd = split(self.BUILD_CA.format(ca_ip))
-        easyrsa.hookenv.unit_public_ip.return_value = ca_ip
+        mock_network_get_data = {'ingress-addresses': [ca_ip]}
+        easyrsa.hookenv.network_get.return_value = mock_network_get_data
 
         expected_file_opens = [
             call(self.CA_FILE, "r"),
@@ -556,6 +557,32 @@ class TestCertificateManagement(TestCase):
 
         # assert that leader data was updated and unit status and flags set
         self.assert_ca_finalized(install_ca_mock)
+
+        # Test exception paths when looking up ingress address
+        expected_msg = 'Public address not available yet'
+        # KeyError
+        mock_network_get_data = {'missing_ingress_key': [ca_ip]}
+        easyrsa.hookenv.network_get.return_value = mock_network_get_data
+        with patch("builtins.open", global_file_mock):
+            easyrsa.create_certificate_authority()
+        easyrsa.status.blocked.assert_called_once_with(expected_msg)
+        easyrsa.status.blocked.reset_mock()
+
+        # IndexError
+        mock_network_get_data = {'ingress-addresses': []}
+        easyrsa.hookenv.network_get.return_value = mock_network_get_data
+        with patch("builtins.open", global_file_mock):
+            easyrsa.create_certificate_authority()
+        easyrsa.status.blocked.assert_called_once_with(expected_msg)
+        easyrsa.status.blocked.reset_mock()
+
+        # CalledProcessError
+        called_process_error = CalledProcessError(returncode=2, cmd=["bad"])
+        easyrsa.hookenv.network_get.side_effect = called_process_error
+        with patch("builtins.open", global_file_mock):
+            easyrsa.create_certificate_authority()
+        easyrsa.status.blocked.assert_called_once_with(expected_msg)
+        easyrsa.status.blocked.reset_mock()
 
     def test_send_ca(self):
         """Test sending CA data over client:tls-certificates relation."""

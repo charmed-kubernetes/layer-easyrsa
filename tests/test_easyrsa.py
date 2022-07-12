@@ -264,9 +264,7 @@ class TestConfiguration(TestCase):
 
         mock_file.assert_has_calls(expected_open_calls, any_order=True)
         file_handle = mock_file()
-        file_handle.writelines.assert_called_once_with(
-            expected_ssl_config_lines
-        )
+        file_handle.writelines.assert_called_once_with(expected_ssl_config_lines)
 
     def test_configure_copy_extension_when_present(self):
         """Test that ssl config file is unchanged.
@@ -287,9 +285,7 @@ class TestConfiguration(TestCase):
 
     def test_configure_client_authorization(self):
         """Test that 'clientAuth' is added as extendedUsage to server certs."""
-        server_conf_file = path.join(
-            easyrsa.easyrsa_directory, "x509-types/server"
-        )
+        server_conf_file = path.join(easyrsa.easyrsa_directory, "x509-types/server")
         # excerpt of easyrsa x509 server certificate conf
         default_server_conf = (
             "basicConstraints = CA:FALSE\n"
@@ -314,9 +310,7 @@ class TestConfiguration(TestCase):
 
         mock_file.assert_has_calls(expected_open_calls, any_order=True)
         file_handle = mock_file()
-        file_handle.writelines.assert_called_once_with(
-            expected_server_conf_lines
-        )
+        file_handle.writelines.assert_called_once_with(expected_server_conf_lines)
 
     @patch.object(easyrsa, "configure_copy_extensions")
     @patch.object(easyrsa, "configure_client_authorization")
@@ -506,7 +500,7 @@ class TestCertificateManagement(TestCase):
         """
         ca_ip = "10.0.0.1"
         build_ca_cmd = split(self.BUILD_CA.format(ca_ip))
-        mock_network_get_data = {'ingress-addresses': [ca_ip]}
+        mock_network_get_data = {"ingress-addresses": [ca_ip]}
         easyrsa.hookenv.network_get.return_value = mock_network_get_data
 
         expected_file_opens = [
@@ -559,9 +553,9 @@ class TestCertificateManagement(TestCase):
         self.assert_ca_finalized(install_ca_mock)
 
         # Test exception paths when looking up ingress address
-        expected_msg = 'Public address not available yet'
+        expected_msg = "Public address not available yet"
         # KeyError
-        mock_network_get_data = {'missing_ingress_key': [ca_ip]}
+        mock_network_get_data = {"missing_ingress_key": [ca_ip]}
         easyrsa.hookenv.network_get.return_value = mock_network_get_data
         with patch("builtins.open", global_file_mock):
             easyrsa.create_certificate_authority()
@@ -569,7 +563,7 @@ class TestCertificateManagement(TestCase):
         easyrsa.status.blocked.reset_mock()
 
         # IndexError
-        mock_network_get_data = {'ingress-addresses': []}
+        mock_network_get_data = {"ingress-addresses": []}
         easyrsa.hookenv.network_get.return_value = mock_network_get_data
         with patch("builtins.open", global_file_mock):
             easyrsa.create_certificate_authority()
@@ -595,9 +589,7 @@ class TestCertificateManagement(TestCase):
         endpoint.set_ca.assert_called_once_with(self.cert_data)
 
     @patch.object(easyrsa, "create_client_certificate")
-    def test_create_global_client_cert(
-        self, create_client_cert_mock: MagicMock
-    ):
+    def test_create_global_client_cert(self, create_client_cert_mock: MagicMock):
         """Test creation of shared client certificate."""
         # Make sure that global client cert is not in leader data
         self.leader_data.pop("client_certificate", None)
@@ -622,9 +614,7 @@ class TestCertificateManagement(TestCase):
         easyrsa.set_flag.assert_called_with(cert_created_flag)
 
     @patch.object(easyrsa, "create_client_certificate")
-    def test_create_global_client_cert_skip(
-        self, create_client_cert_mock: MagicMock
-    ):
+    def test_create_global_client_cert_skip(self, create_client_cert_mock: MagicMock):
         """Test that shared client certificate is not re-created.
 
         When global client certificate is already present in leader data, it
@@ -691,12 +681,8 @@ class TestCertificateManagement(TestCase):
         easyrsa.create_server_cert()
 
         # assert that certificates were created and stored in the relations
-        request_1.set_cert.assert_called_once_with(
-            expected_cert_1, expected_key_1
-        )
-        request_2.set_cert.assert_called_once_with(
-            expected_cert_2, expected_key_2
-        )
+        request_1.set_cert.assert_called_once_with(expected_cert_1, expected_key_1)
+        request_2.set_cert.assert_called_once_with(expected_cert_2, expected_key_2)
 
     @patch.object(easyrsa, "create_client_certificate")
     def test_create_client_cert(self, create_cert_mock: MagicMock):
@@ -726,12 +712,8 @@ class TestCertificateManagement(TestCase):
         easyrsa.create_client_cert()
 
         # assert that certificates were created and stored in the relations
-        request_1.set_cert.assert_called_once_with(
-            expected_cert_1, expected_key_1
-        )
-        request_2.set_cert.assert_called_once_with(
-            expected_cert_2, expected_key_2
-        )
+        request_1.set_cert.assert_called_once_with(expected_cert_1, expected_key_1)
+        request_2.set_cert.assert_called_once_with(expected_cert_2, expected_key_2)
 
     def test_generate_server_certificate_new_default_name(self):
         """Test that server cert generating function creates new certificate.
@@ -1029,9 +1011,7 @@ class TestCertificateManagement(TestCase):
         """Install the CA as trusted authority in the systems."""
         update_ca_call = split("update-ca-certificates")
         ca_name = "easyrsa_ca"
-        ca_system_path = "/usr/local/share/ca-certificates/{0}.crt".format(
-            ca_name
-        )
+        ca_system_path = "/usr/local/share/ca-certificates/{0}.crt".format(ca_name)
         easyrsa.hookenv.service_name.return_value = ca_name
 
         file_mock = mock_open()

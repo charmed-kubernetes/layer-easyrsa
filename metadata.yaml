@@ -29,6 +29,6 @@ resources:
       https://github.com/OpenVPN/easy-rsa/releases
 series:
   - focal
+  - jammy
   - bionic
   - xenial
-  - trusty

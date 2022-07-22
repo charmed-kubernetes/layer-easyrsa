@@ -22,7 +22,7 @@ from unittest.mock import MagicMock, patch, call, mock_open
 from actions import actions
 
 
-def tls_certificate_relation(name, cert_type='client'):
+def tls_certificate_relation(name, cert_type="client"):
     mock_ = MagicMock()
     mock_.common_name = name
     mock_.sans = "DNS:{}".format(name)
@@ -32,9 +32,9 @@ def tls_certificate_relation(name, cert_type='client'):
 
 class _ActionTestCase(TestCase):
 
-    NAME = ''
+    NAME = ""
 
-    def __init__(self, methodName='runTest'):
+    def __init__(self, methodName="runTest"):
         super(_ActionTestCase, self).__init__(methodName)
         self._func_args = {}
         self.pki_dir = os.path.join(actions.easyrsa_directory, "pki")
@@ -73,13 +73,14 @@ class _ActionTestCase(TestCase):
         """
         to_mock = to_mock or {}
         default_mock = {
-            actions: {'function_get',
-                      'function_set',
-                      'function_fail',
-                      'local_unit',
-                      'leader_set',
-                      'leader_get',
-                      }
+            actions: {
+                "function_get",
+                "function_set",
+                "function_fail",
+                "local_unit",
+                "leader_set",
+                "leader_get",
+            }
         }
         for key, value in to_mock.items():
             if key in default_mock:
@@ -112,8 +113,9 @@ class _ActionTestCase(TestCase):
 
     def assert_function_fail_msg(self, msg):
         """Shortcut for asserting error with default structure"""
-        actions.function_fail.assert_called_with("Action {} failed: "
-                                                 "{}".format(self.NAME, msg))
+        actions.function_fail.assert_called_with(
+            "Action {} failed: " "{}".format(self.NAME, msg)
+        )
 
     def call_action(self):
         """Shortcut to calling action based on the current TestCase"""
@@ -121,26 +123,26 @@ class _ActionTestCase(TestCase):
 
 
 class GeneralActionsTests(_ActionTestCase):
-
     def test_action_unknown(self):
         """Verify that attempt to perform unknown action fails"""
-        bad_action = 'foo'
+        bad_action = "foo"
         actions.main([bad_action])
-        actions.function_fail.assert_called_with("Action {} undefined"
-                                                 "".format(bad_action))
+        actions.function_fail.assert_called_with(
+            "Action {} undefined" "".format(bad_action)
+        )
 
 
 class BackupActionsTests(_ActionTestCase):
 
-    NAME = 'backup'
+    NAME = "backup"
 
     def setUp(self, to_mock=None):
         additional_mocks = {
-            actions.pwd: ['getpwnam'],
-            actions.grp: ['getgrnam'],
-            actions.os: ['chown', 'mkdir'],
-            actions.os.path: ['isdir'],
-            actions.tarfile: ['open'],
+            actions.pwd: ["getpwnam"],
+            actions.grp: ["getgrnam"],
+            actions.os: ["chown", "mkdir"],
+            actions.os.path: ["isdir"],
+            actions.tarfile: ["open"],
         }
         super(BackupActionsTests, self).setUp(to_mock=additional_mocks)
 
@@ -148,48 +150,48 @@ class BackupActionsTests(_ActionTestCase):
         """Don't fail if destination directory for backups already exists"""
         actions.os.mkdir.side_effect = FileExistsError()
         self.call_action()
-        actions.os.mkdir.assert_called_once_with(actions.PKI_BACKUP,
-                                                 mode=0o700)
+        actions.os.mkdir.assert_called_once_with(actions.PKI_BACKUP, mode=0o700)
         actions.function_fail.assert_not_called()
 
     def test_destination_not_dir(self):
         """Fail if default backup destination exists but it's not a dir"""
         actions.os.path.isdir.return_value = False
-        patch.object(actions.os, 'mkdir')
-        patch.object(actions.os.path, 'isdir')
+        patch.object(actions.os, "mkdir")
+        patch.object(actions.os.path, "isdir")
         self.call_action()
-        self.assert_function_fail_msg('Backup destination is not a directory.')
+        self.assert_function_fail_msg("Backup destination is not a directory.")
 
-    @patch.object(actions, 'datetime')
+    @patch.object(actions, "datetime")
     def test_backup_filename_format(self, mock_datetime):
         """Test that backups are saved to the file with expected name"""
         freeze_time = datetime(2020, 1, 1)
         mock_datetime.now = MagicMock(return_value=freeze_time)
-        timestamp = freeze_time.strftime('%Y-%m-%d_%H-%M-%S')
-        expected_path = os.path.join(actions.PKI_BACKUP,
-                                     'easyrsa-{}.tar.gz'.format(timestamp))
-        expected_format = 'w:gz'
+        timestamp = freeze_time.strftime("%Y-%m-%d_%H-%M-%S")
+        expected_path = os.path.join(
+            actions.PKI_BACKUP, "easyrsa-{}.tar.gz".format(timestamp)
+        )
+        expected_format = "w:gz"
 
         self.call_action()
-        actions.tarfile.open.assert_called_with(expected_path,
-                                                mode=expected_format)
+        actions.tarfile.open.assert_called_with(expected_path, mode=expected_format)
         actions.function_fail.assert_not_called()
 
-    @patch.object(actions, 'datetime')
+    @patch.object(actions, "datetime")
     def test_response(self, mock_datetime):
         """Test successful backup response"""
         freeze_time = datetime(2020, 1, 1)
         mock_datetime.now = MagicMock(return_value=freeze_time)
-        timestamp = freeze_time.strftime('%Y-%m-%d_%H-%M-%S')
-        expected_path = os.path.join(actions.PKI_BACKUP,
-                                     'easyrsa-{}.tar.gz'.format(timestamp))
-        local_unit = 'easyrsa/0'
+        timestamp = freeze_time.strftime("%Y-%m-%d_%H-%M-%S")
+        expected_path = os.path.join(
+            actions.PKI_BACKUP, "easyrsa-{}.tar.gz".format(timestamp)
+        )
+        local_unit = "easyrsa/0"
         actions.local_unit.return_value = local_unit
         self.call_action()
         expected_arguments = {
-            'command': 'juju scp {}:{} .'.format(local_unit, expected_path),
-            'message': 'Backup archive created successfully. Use the juju scp'
-                       ' command to copy it to your local machine.'
+            "command": "juju scp {}:{} .".format(local_unit, expected_path),
+            "message": "Backup archive created successfully. Use the juju scp"
+            " command to copy it to your local machine.",
         }
 
         actions.function_set.assert_called_with(expected_arguments)
@@ -198,11 +200,11 @@ class BackupActionsTests(_ActionTestCase):
 
 class ListBackupTests(_ActionTestCase):
 
-    NAME = 'list-backups'
+    NAME = "list-backups"
 
     def setUp(self, to_mock=None):
         additional_mocks = {
-            actions.os: ['listdir'],
+            actions.os: ["listdir"],
         }
         super(ListBackupTests, self).setUp(to_mock=additional_mocks)
 
@@ -217,43 +219,42 @@ class ListBackupTests(_ActionTestCase):
         actions.os.listdir.return_value = []
         self.call_action()
 
-        expected_response = {'message': 'There are no available backup files.'}
+        expected_response = {"message": "There are no available backup files."}
         actions.function_set.assert_called_with(expected_response)
         actions.function_fail.assert_not_called()
 
     def test_backup_list_response(self):
         """Test response containing list of available backups"""
-        backups = ['backup1.tar.gz', 'backup2.tar.gz']
+        backups = ["backup1.tar.gz", "backup2.tar.gz"]
         actions.os.listdir.return_value = backups
         self.call_action()
 
-        expected_text = "Available backup " \
-                        "files:\n{}".format("\n".join(backups))
+        expected_text = "Available backup " "files:\n{}".format("\n".join(backups))
 
-        actions.function_set({'message': expected_text})
+        actions.function_set({"message": expected_text})
         actions.function_fail.assert_not_called()
 
 
 class DeleteBackupTests(_ActionTestCase):
 
-    NAME = 'delete-backup'
+    NAME = "delete-backup"
 
-    def __init__(self, methodName='runTest'):
+    def __init__(self, methodName="runTest"):
         super(DeleteBackupTests, self).__init__(methodName)
-        self._func_args = {'name': None, 'all': None}
+        self._func_args = {"name": None, "all": None}
 
     def setUp(self, to_mock=None):
         additional_mocks = {
-            actions.os: ['remove', 'mkdir'],
-            actions.shutil: ['rmtree'],
-            actions.os.path: ['realpath'],
+            actions.os: ["remove", "mkdir"],
+            actions.shutil: ["rmtree"],
+            actions.os.path: ["realpath"],
         }
         super(DeleteBackupTests, self).setUp(to_mock=additional_mocks)
 
         realpaths = [
-            os.path.join('/home', 'ubuntu', 'easyrsa_backup', 'foo.tar.gz'),
-            os.path.join('/home', 'ubuntu', 'easyrsa_backup'),
-            ]
+            os.path.join("/home", "ubuntu", "easyrsa_backup", "foo.tar.gz"),
+            os.path.join("/home", "ubuntu", "easyrsa_backup"),
+        ]
         actions.os.path.realpath.side_effect = realpaths
 
     @contextmanager
@@ -266,7 +267,7 @@ class DeleteBackupTests(_ActionTestCase):
         """
         default = copy(self._func_args)
         try:
-            self._func_args = {'name': name, 'all': all_}
+            self._func_args = {"name": name, "all": all_}
             yield
         finally:
             self._func_args = copy(default)
@@ -275,13 +276,14 @@ class DeleteBackupTests(_ActionTestCase):
         """Name is required if we are not deleting all the backups"""
         with self.func_call_arguments(name=None, all_=False):
             self.call_action()
-            expected_err = "Parameter 'name' is required if parameter " \
-                           "'all' is False."
+            expected_err = (
+                "Parameter 'name' is required if parameter " "'all' is False."
+            )
             self.assert_function_fail_msg(expected_err)
 
     def test_single_file_delete(self):
         """Test single file deletion"""
-        backup_name = 'foo.tar.gz'
+        backup_name = "foo.tar.gz"
         full_path = os.path.join(actions.PKI_BACKUP, backup_name)
 
         with self.func_call_arguments(name=backup_name):
@@ -291,20 +293,19 @@ class DeleteBackupTests(_ActionTestCase):
 
     def test_file_delete_failed(self):
         """Test error if file deletion fails"""
-        backup_name = 'bar.tar.gz'
+        backup_name = "bar.tar.gz"
         actions.os.remove.side_effect = FileNotFoundError()
 
         with self.func_call_arguments(name=backup_name):
             self.call_action()
-            expected_err = "Backup file '{}' does not " \
-                           "exist".format(backup_name)
+            expected_err = "Backup file '{}' does not " "exist".format(backup_name)
             self.assert_function_fail_msg(expected_err)
 
     def test_delete_path_traversal(self):
         """Test that attempt at path traversal fails"""
-        backup_name = '../../../bin/bash'
-        resolved_path = '/bin/bash'
-        expected_parent_dir = actions.PKI_BACKUP + '/'
+        backup_name = "../../../bin/bash"
+        resolved_path = "/bin/bash"
+        expected_parent_dir = actions.PKI_BACKUP + "/"
         realpaths = [
             resolved_path,
             expected_parent_dir,
@@ -313,9 +314,10 @@ class DeleteBackupTests(_ActionTestCase):
 
         with self.func_call_arguments(name=backup_name):
             self.call_action()
-            expected_err = "Path traversal detected. '{}' tries to travers" \
-                           " out of {}".format(resolved_path,
-                                               expected_parent_dir)
+            expected_err = (
+                "Path traversal detected. '{}' tries to travers"
+                " out of {}".format(resolved_path, expected_parent_dir)
+            )
             self.assert_function_fail_msg(expected_err)
 
     def test_delete_all(self):
@@ -330,22 +332,22 @@ class DeleteBackupTests(_ActionTestCase):
 
 class RestoreActionTests(_ActionTestCase):
 
-    NAME = 'restore'
+    NAME = "restore"
 
-    def __init__(self, methodName='runTest'):
+    def __init__(self, methodName="runTest"):
         super(RestoreActionTests, self).__init__(methodName)
-        self._func_args = {'name': None}
+        self._func_args = {"name": None}
         self.tar_ctx = MagicMock()
         self.tar_obj = MagicMock()
-        self.mock_file_content = 'content'
+        self.mock_file_content = "content"
 
     def setUp(self, to_mock=None):
         additional_mocks = {
-            actions: ['endpoint_from_name'],
-            actions.os.path: ['isfile', 'realpath'],
-            actions.tarfile.TarFile: ['getnames', 'extractall'],
-            actions.tarfile: ['open'],
-            actions.shutil: ['move', 'rmtree'],
+            actions: ["endpoint_from_name"],
+            actions.os.path: ["isfile", "realpath"],
+            actions.tarfile.TarFile: ["getnames", "extractall"],
+            actions.tarfile: ["open"],
+            actions.shutil: ["move", "rmtree"],
         }
         super(RestoreActionTests, self).setUp(to_mock=additional_mocks)
         # Mock contextmanager 'with tarfile.open() as tar:'
@@ -354,8 +356,8 @@ class RestoreActionTests(_ActionTestCase):
         actions.tarfile.open.return_value = self.tar_ctx
 
         realpaths = [
-            os.path.join(actions.easyrsa_directory, 'pki', 'foo'),
-            os.path.join(actions.easyrsa_directory, 'pki'),
+            os.path.join(actions.easyrsa_directory, "pki", "foo"),
+            os.path.join(actions.easyrsa_directory, "pki"),
         ]
         actions.os.path.realpath.side_effect = realpaths
 
@@ -369,7 +371,7 @@ class RestoreActionTests(_ActionTestCase):
         """
         default = copy(self._func_args)
         try:
-            self._func_args = {'name': name}
+            self._func_args = {"name": name}
             yield
         finally:
             self._func_args = copy(default)
@@ -381,14 +383,14 @@ class RestoreActionTests(_ActionTestCase):
         :return: None
         """
         actions._verify_backup.assert_called_once_with(self.tar_obj)
-        actions._replace_pki.assert_called_once_with(self.tar_obj,
-                                                     self.pki_dir)
-        actions._update_leadership_data.assert_called_once_with(self.pki_dir,
-                                                                self.cert_dir,
-                                                                self.key_dir)
+        actions._replace_pki.assert_called_once_with(self.tar_obj, self.pki_dir)
+        actions._update_leadership_data.assert_called_once_with(
+            self.pki_dir, self.cert_dir, self.key_dir
+        )
         provider.set_ca.assert_called_once_with(self.ca_cert)
-        provider.set_client_cert.assert_called_once_with(self.client_cert,
-                                                         self.client_key)
+        provider.set_client_cert.assert_called_once_with(
+            self.client_cert, self.client_key
+        )
 
     def test_require_name(self):
         """Parameter 'name' is required by the 'restore' action"""
@@ -399,52 +401,55 @@ class RestoreActionTests(_ActionTestCase):
     def test_missing_backup_file(self):
         """Fail if backup archive specified by 'name' is not foud"""
         actions.os.path.isfile.return_value = False
-        backup_name = 'foo.tar.gz'
-        expected_error = "Backup with name '{}' does not exist. Use action " \
-                         "'list-backups' to list all available " \
-                         "backups".format(backup_name)
-        with self.func_call_arguments(name='foo.tar.gz'):
+        backup_name = "foo.tar.gz"
+        expected_error = (
+            "Backup with name '{}' does not exist. Use action "
+            "'list-backups' to list all available "
+            "backups".format(backup_name)
+        )
+        with self.func_call_arguments(name="foo.tar.gz"):
             self.call_action()
             self.assert_function_fail_msg(expected_error)
 
     def test_bad_backup_structure(self):
         """Fail if the backup archive does not have the expected structure"""
         bad_tar_structure = {
-            'foo',
-            'bar',
-            'bad/structure',
+            "foo",
+            "bar",
+            "bad/structure",
         }
         self.tar_obj.getnames.return_value = bad_tar_structure
         expected_error = "Backup has unexpected content. Corrupted file?"
 
-        with self.func_call_arguments(name='backup.tar.gz'):
+        with self.func_call_arguments(name="backup.tar.gz"):
             self.call_action()
             self.assert_function_fail_msg(expected_error)
 
-    @patch.object(actions, '_check_path_traversal')
+    @patch.object(actions, "_check_path_traversal")
     def test_failed_extract_restore_original_pki(self, _):
         """Test that original pki is restored in case of failure"""
-        pki_dst = os.path.join(actions.easyrsa_directory, 'pki')
-        safety_backup = os.path.join(actions.easyrsa_directory, 'pki_backup')
-        exception_message = 'Extraction failed'
+        pki_dst = os.path.join(actions.easyrsa_directory, "pki")
+        safety_backup = os.path.join(actions.easyrsa_directory, "pki_backup")
+        exception_message = "Extraction failed"
 
         self.tar_obj.extractall.side_effect = Exception(exception_message)
-        expected_error = 'Failed to extract backup bundle. ' \
-                         'Error: {}'.format(exception_message)
+        expected_error = "Failed to extract backup bundle. " "Error: {}".format(
+            exception_message
+        )
 
         expected_move_calls = [
             call(pki_dst, safety_backup),  # Original pki set aside
-            call(safety_backup, pki_dst)   # Original pki restored
+            call(safety_backup, pki_dst),  # Original pki restored
         ]
 
-        with self.func_call_arguments(name='backup.tar.gz'):
+        with self.func_call_arguments(name="backup.tar.gz"):
             self.call_action()
             actions.shutil.move.assert_has_calls(expected_move_calls)
             self.assert_function_fail_msg(expected_error)
 
     def test_replace_pki_cleans_up(self):
         """Test that `_replace_pki` function cleans up safety backup."""
-        safety_backup = os.path.join(actions.easyrsa_directory, 'pki_backup')
+        safety_backup = os.path.join(actions.easyrsa_directory, "pki_backup")
         pki_tar = MagicMock()
         pki_dir = "/tmp/pki"
 
@@ -459,19 +464,21 @@ class RestoreActionTests(_ActionTestCase):
         """Test that relative paths in tarball can't traverse outside
         expected parent dir"""
         malicious_tarball = copy(actions.TAR_STRUCTURE)
-        malicious_tarball.add('../../../bin/bash')
-        resolved_malicious_path = '/bin/bash'
+        malicious_tarball.add("../../../bin/bash")
+        resolved_malicious_path = "/bin/bash"
         realpaths = [
             resolved_malicious_path,
-            os.path.join(actions.easyrsa_directory, 'pki'),
+            os.path.join(actions.easyrsa_directory, "pki"),
         ]
         actions.os.path.realpath.side_effect = realpaths
-        expected_error = "Path traversal detected. " \
-                         "'{}' tries to travers out of charm_dir/" \
-                         "EasyRSA/pki/".format(resolved_malicious_path)
+        expected_error = (
+            "Path traversal detected. "
+            "'{}' tries to travers out of charm_dir/"
+            "EasyRSA/pki/".format(resolved_malicious_path)
+        )
         self.tar_obj.getnames.return_value = malicious_tarball
 
-        with self.func_call_arguments(name='backup.tar.gz'):
+        with self.func_call_arguments(name="backup.tar.gz"):
             self.call_action()
             self.assert_function_fail_msg(expected_error)
 
@@ -484,14 +491,14 @@ class RestoreActionTests(_ActionTestCase):
         """
         mock_data = "mock_data"
         leader_set_calls = [
-            call({'certificate_authority': mock_data}),
-            call({'certificate_authority_key': mock_data}),
-            call({'certificate_authority_serial': mock_data}),
-            call({'client_certificate': mock_data}),
-            call({'client_key': mock_data}),
+            call({"certificate_authority": mock_data}),
+            call({"certificate_authority_key": mock_data}),
+            call({"certificate_authority_serial": mock_data}),
+            call({"client_certificate": mock_data}),
+            call({"client_key": mock_data}),
         ]
 
-        actions._update_leadership_data('foo', 'bar', 'baz')
+        actions._update_leadership_data("foo", "bar", "baz")
         actions.leader_set.has_calls(leader_set_calls, any_order=True)
 
     def test_restore_action_all_certs_found(self):
@@ -501,12 +508,13 @@ class RestoreActionTests(_ActionTestCase):
         charm units have valid certificate in the backup bundle.
         """
         mock_internal = {
-            actions: ['_verify_backup',
-                      '_replace_pki',
-                      '_update_leadership_data',
-                      'create_client_certificate',
-                      'create_server_certificate',
-                      ]
+            actions: [
+                "_verify_backup",
+                "_replace_pki",
+                "_update_leadership_data",
+                "create_client_certificate",
+                "create_server_certificate",
+            ]
         }
         self.patch_all(mock_internal)
 
@@ -515,7 +523,7 @@ class RestoreActionTests(_ActionTestCase):
         key_data = "found key data"
 
         tls_provider = MagicMock()
-        tls_cert_relation = tls_certificate_relation('tls_client', 'client')
+        tls_cert_relation = tls_certificate_relation("tls_client", "client")
         tls_provider.all_requests = [tls_cert_relation]
         actions.endpoint_from_name.return_value = tls_provider
 
@@ -532,8 +540,8 @@ class RestoreActionTests(_ActionTestCase):
 
         file_mock.side_effect = (cert_file_handle, key_file_handle)
 
-        with patch('builtins.open', file_mock):
-            with self.func_call_arguments(name='backup.tar.gz'):
+        with patch("builtins.open", file_mock):
+            with self.func_call_arguments(name="backup.tar.gz"):
                 self.call_action()
 
         self.assert_common_restore_actions(tls_provider)
@@ -546,38 +554,39 @@ class RestoreActionTests(_ActionTestCase):
         unit is not found in the backup bundle.
         """
         mock_internal = {
-            actions: ['_verify_backup',
-                      '_replace_pki',
-                      '_update_leadership_data',
-                      'create_client_certificate',
-                      'create_server_certificate',
-                      ]
+            actions: [
+                "_verify_backup",
+                "_replace_pki",
+                "_update_leadership_data",
+                "create_client_certificate",
+                "create_server_certificate",
+            ]
         }
         self.patch_all(mock_internal)
 
         client_cert = MagicMock()
         client_key = MagicMock()
         tls_provider = MagicMock()
-        tls_cert_relation = tls_certificate_relation('tls_client', 'client')
+        tls_cert_relation = tls_certificate_relation("tls_client", "client")
         tls_provider.all_requests = [tls_cert_relation]
         actions.endpoint_from_name.return_value = tls_provider
-        actions.create_client_certificate.return_value = (client_cert,
-                                                          client_key)
+        actions.create_client_certificate.return_value = (client_cert, client_key)
 
         # Generate client certificate for host missing in backup
         # builtin 'open()' function will raise FileNotFoundError, which acts
         # as if the file was not found in the backup
-        with patch('builtins.open', new_callable=mock_open, read_data='data') \
-                as mock_file:
+        with patch(
+            "builtins.open", new_callable=mock_open, read_data="data"
+        ) as mock_file:
             mock_file.side_effect = FileNotFoundError
-            with self.func_call_arguments(name='backup.tar.gz'):
+            with self.func_call_arguments(name="backup.tar.gz"):
                 self.call_action()
 
         self.assert_common_restore_actions(tls_provider)
         actions.create_client_certificate.assert_called_once_with(
-            tls_cert_relation.common_name)
-        tls_cert_relation.set_cert.assert_called_once_with(client_cert,
-                                                           client_key)
+            tls_cert_relation.common_name
+        )
+        tls_cert_relation.set_cert.assert_called_once_with(client_cert, client_key)
 
     def test_restore_action_server_missing(self):
         """Test 'restore' action when new server cert needs to be generated.
@@ -586,40 +595,41 @@ class RestoreActionTests(_ActionTestCase):
         unit is not found in the backup bundle.
         """
         mock_internal = {
-            actions: ['_verify_backup',
-                      '_replace_pki',
-                      '_update_leadership_data',
-                      'create_client_certificate',
-                      'create_server_certificate',
-                      ]
+            actions: [
+                "_verify_backup",
+                "_replace_pki",
+                "_update_leadership_data",
+                "create_client_certificate",
+                "create_server_certificate",
+            ]
         }
         self.patch_all(mock_internal)
 
         server_cert = MagicMock()
         server_key = MagicMock()
         tls_provider = MagicMock()
-        tls_cert_relation = tls_certificate_relation('tls_server', 'server')
+        tls_cert_relation = tls_certificate_relation("tls_server", "server")
         tls_provider.all_requests = [tls_cert_relation]
         actions.endpoint_from_name.return_value = tls_provider
-        actions.create_server_certificate.return_value = (server_cert,
-                                                          server_key)
+        actions.create_server_certificate.return_value = (server_cert, server_key)
 
         # Generate server certificate for host missing in backup
         # builtin 'open()' function will raise FileNotFoundError, which acts
         # as if the file was not found in the backup
-        with patch('builtins.open', new_callable=mock_open, read_data='data') \
-                as mock_file:
+        with patch(
+            "builtins.open", new_callable=mock_open, read_data="data"
+        ) as mock_file:
             mock_file.side_effect = FileNotFoundError()
-            with self.func_call_arguments(name='backup.tar.gz'):
+            with self.func_call_arguments(name="backup.tar.gz"):
                 self.call_action()
 
         self.assert_common_restore_actions(tls_provider)
         actions.create_server_certificate.assert_called_once_with(
             tls_cert_relation.common_name,
             tls_cert_relation.sans,
-            tls_cert_relation.common_name)
-        tls_cert_relation.set_cert.assert_called_once_with(server_cert,
-                                                           server_key)
+            tls_cert_relation.common_name,
+        )
+        tls_cert_relation.set_cert.assert_called_once_with(server_cert, server_key)
 
     def test_restore_action_unknown_cert_type(self):
         """Test 'restore' action fails when it wants to restore unknown cert.
@@ -629,30 +639,32 @@ class RestoreActionTests(_ActionTestCase):
         covered just to be sure.
         """
         mock_internal = {
-            actions: ['_verify_backup',
-                      '_replace_pki',
-                      '_update_leadership_data',
-                      'create_client_certificate',
-                      'create_server_certificate',
-                      ]
+            actions: [
+                "_verify_backup",
+                "_replace_pki",
+                "_update_leadership_data",
+                "create_client_certificate",
+                "create_server_certificate",
+            ]
         }
         self.patch_all(mock_internal)
 
         tls_provider = MagicMock()
         unsupported_cert_type = "application"
-        expected_msg = ('Unrecognized certificate request '
-                        'type "{}".'.format(unsupported_cert_type))
-        tls_cert_relation = tls_certificate_relation('tls_cert',
-                                                     unsupported_cert_type)
+        expected_msg = "Unrecognized certificate request " 'type "{}".'.format(
+            unsupported_cert_type
+        )
+        tls_cert_relation = tls_certificate_relation("tls_cert", unsupported_cert_type)
         tls_provider.all_requests = [tls_cert_relation]
         actions.endpoint_from_name.return_value = tls_provider
 
         # Generate client certificate for host missing in backup with
         # unsupported cert type.
-        with patch('builtins.open', new_callable=mock_open, read_data='data') \
-                as mock_file:
+        with patch(
+            "builtins.open", new_callable=mock_open, read_data="data"
+        ) as mock_file:
             mock_file.side_effect = FileNotFoundError
-            with self.func_call_arguments(name='backup.tar.gz'):
+            with self.func_call_arguments(name="backup.tar.gz"):
                 self.call_action()
 
             self.assert_function_fail_msg(expected_msg)

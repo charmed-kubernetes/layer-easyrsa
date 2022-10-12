@@ -295,7 +295,11 @@ def publish_global_client_cert():
     tls.set_client_cert(leader_get("client_certificate"), leader_get("client_key"))
 
 
-@when("client.server.certs.requested", "easyrsa.configured")
+@when(
+    "client.server.certs.requested",
+    "easyrsa.configured",
+    "easyrsa.certificate.authority.available",
+)
 def create_server_cert():
     """Create server certificates with the request information from the
     relation object."""

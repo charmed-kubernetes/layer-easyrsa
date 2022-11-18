@@ -28,6 +28,5 @@ resources:
       not work. You can find the releases of EasyRSA at 
       https://github.com/OpenVPN/easy-rsa/releases
 series:
-  - focal
   - jammy
-  - bionic
+  - focal

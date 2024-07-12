@@ -499,7 +499,7 @@ class RestoreActionTests(_ActionTestCase):
         ]
 
         actions._update_leadership_data("foo", "bar", "baz")
-        actions.leader_set.has_calls(leader_set_calls, any_order=True)
+        actions.leader_set.assert_has_calls(leader_set_calls, any_order=True)
 
     def test_restore_action_all_certs_found(self):
         """Test 'restore' action without generating new certs.

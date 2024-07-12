@@ -1,4 +1,5 @@
 """Unit tests for easyrsa reactive layer."""
+
 from os import path
 from shlex import split
 from unittest import TestCase

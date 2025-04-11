@@ -21,8 +21,8 @@ resources:
     description: |
       The release of the EasyRSA software you would like to use to create
       certificate authority (CA) and other Public Key Infrastructure (PKI). 
-      This charm is written using v3.0.9, so earlier versions of EasyRSA may 
-      not work. You can find the releases of EasyRSA at 
+      This charm supports v3.0.1 -> v3.0.9, other versions of EasyRSA may not
+      work. You can find the releases of EasyRSA at
       https://github.com/OpenVPN/easy-rsa/releases
 series:
   - noble

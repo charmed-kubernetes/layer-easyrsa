@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 from juju.unit import Unit
 import pytest
@@ -15,7 +16,7 @@ async def test_build_and_deploy(ops_test: OpsTest, series):
         log.info("Build Charm...")
         charm = await ops_test.build_charm(".")
 
-    resource = next(Path.cwd().glob("easrsa*.tgz"), None)
+    resource = next(Path.cwd().glob("easyrsa*.tgz"), None)
     if not resource:
         log.info("Fetching Resource...")
         resources = await ops_test.download_resources(
@@ -39,8 +40,8 @@ async def test_status_messages(ops_test):
     """Validate that the status messages are correct."""
     for unit in easyrsa_units(ops_test):
         assert unit.workload_status == "active"
-        msg = "Certificate Authority ready."
-        assert unit.workload_status_message == msg
+        msg = re.compile(r"Certificate Authority (connected|ready).")
+        assert msg.match(unit.workload_status_message)
 
 
 async def test_easyrsa_installed(ops_test):

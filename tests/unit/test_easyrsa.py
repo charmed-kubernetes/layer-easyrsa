@@ -10,6 +10,7 @@ from charmhelpers.core import unitdata
 from reactive import easyrsa
 
 FLAG_INSTALLED = "easyrsa.installed"
+SSL_CONF_FILE = path.join(easyrsa.easyrsa_directory, "openssl-1.0.cnf")
 
 
 class TestInstall(TestCase):
@@ -247,14 +248,17 @@ class TestConfiguration(TestCase):
             expected_version
         )
 
+    @patch(
+        "glob.iglob",
+        MagicMock(return_value=(SSL_CONF_FILE,)),
+    )
     def test_configure_copy_extensions_when_missing(self):
         """Test that `copy_extensions` attribute is added to ssl config."""
-        ssl_conf_file = path.join(easyrsa.easyrsa_directory, "openssl-1.0.cnf")
         ssl_conf = "[ CA_default ]"
         expected_ssl_config_lines = [ssl_conf, "copy_extensions = copy\n"]
         expected_open_calls = [
-            call(ssl_conf_file, "r"),
-            call(ssl_conf_file, "w+"),
+            call(SSL_CONF_FILE, "r"),
+            call(SSL_CONF_FILE, "w+"),
         ]
         mock_file = mock_open(read_data=ssl_conf)
 
@@ -267,20 +271,23 @@ class TestConfiguration(TestCase):
         file_handle = mock_file()
         file_handle.writelines.assert_called_once_with(expected_ssl_config_lines)
 
+    @patch(
+        "glob.iglob",
+        MagicMock(return_value=(SSL_CONF_FILE,)),
+    )
     def test_configure_copy_extension_when_present(self):
         """Test that ssl config file is unchanged.
 
         If `copy_extension = copy` is already present in the ssl config file,
         it should not be changed.
         """
-        ssl_conf_file = path.join(easyrsa.easyrsa_directory, "openssl-1.0.cnf")
         ssl_conf = "[ CA_default ]\ncopy_extensions = copy\n"
         mock_file = mock_open(read_data=ssl_conf)
 
         with patch("builtins.open", mock_file):
             easyrsa.configure_copy_extensions()
 
-        mock_file.assert_called_with(ssl_conf_file, "r")
+        mock_file.assert_called_with(SSL_CONF_FILE, "r")
         file_handle = mock_file()
         file_handle.writelines.assert_not_called()
 

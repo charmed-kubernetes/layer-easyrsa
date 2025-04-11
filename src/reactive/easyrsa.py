@@ -1,3 +1,4 @@
+import glob
 import ipaddress
 import os
 import shutil
@@ -111,7 +112,7 @@ def configure_copy_extensions():
     """Update the EasyRSA configuration with the capacity to copy the exensions
     through to the resulting certificates."""
     # Create an absolute path to the file which will not be impacted by cwd.
-    openssl_file = os.path.join(easyrsa_directory, "openssl-1.0.cnf")
+    (openssl_file,) = glob.iglob(os.path.join(easyrsa_directory, "openssl-*.cnf"))
     # Update EasyRSA configuration with the capacity to copy CSR Requested
     # Extensions through to the resulting certificate. This can be tricky,
     # and the implications are not fully clear on this.

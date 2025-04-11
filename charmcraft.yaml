@@ -18,14 +18,15 @@ parts:
     plugin: reactive
     override-build: |
       ./download_layers.sh
+      git -C $CRAFT_PROJECT_DIR rev-parse --short HEAD > $CRAFT_PART_INSTALL/version
       craftctl default
-      git -C $CRAFT_PROJECT_DIR rev-parse --short HEAD > version
     reactive-charm-build-arguments:
     - --layer-index
     - 'http://localhost/'  # Fake layer index to force a local build
     - --debug
     - --force
     build-packages:
+    - git
     - wget
     - python3-dev
     build-snaps:

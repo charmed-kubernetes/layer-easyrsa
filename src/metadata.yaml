@@ -5,11 +5,8 @@ description: |
   a Certificate Authority (CA), server certificates, and client certificates.
 docs: https://discourse.charmhub.io/t/easyrsa-docs-index/6211
 maintainers:
-  - Tim Van Steenburgh <tim.van.steenburgh@canonical.com>
-  - George Kraft <george.kraft@canonical.com>
-  - Rye Terrell <rye.terrell@canonical.com>
   - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
-  - Matthew Bruzek <mbruzek@ubuntu.com>
+  - Adam Dyess <adam.dyess@canonical.com>
 tags:
   - tls
   - pki
@@ -24,7 +21,7 @@ resources:
     description: |
       The release of the EasyRSA software you would like to use to create
       certificate authority (CA) and other Public Key Infrastructure (PKI). 
-      This charm was written using v3.0.1, so earlier versions of EasyRSA may 
+      This charm is written using v3.0.9, so earlier versions of EasyRSA may 
       not work. You can find the releases of EasyRSA at 
       https://github.com/OpenVPN/easy-rsa/releases
 series:

@@ -2,5 +2,7 @@
 .cache
 .coverage
 .unit-state.db
+*.tgz
+*.charm
 *__pycache__
 *.pyc

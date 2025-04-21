@@ -1,0 +1,12 @@
+applications:
+  {% for s in series -%}
+  easyrsa-{{ s }}:
+    charm: {{ main_charm }}
+    num_units: 1
+    series: {{ s }}
+    constraints: arch=amd64 virt-type=virtual-machine
+    resources:
+      {% for r in resources -%}
+      {{ r }}: {{ resources[r] }}
+      {% endfor %}
+  {% endfor %}

@@ -1,0 +1,29 @@
+name: easyrsa
+summary: Delivers EasyRSA to create a Certificate Authority (CA).
+description: |
+  This charm delivers the EasyRSA application and through Juju events creates
+  a Certificate Authority (CA), server certificates, and client certificates.
+docs: https://discourse.charmhub.io/t/easyrsa-docs-index/6211
+maintainers:
+  - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
+  - Adam Dyess <adam.dyess@canonical.com>
+tags:
+  - tls
+  - pki
+  - ca
+provides:
+  client:
+    interface: tls-certificates
+resources:
+  easyrsa:
+    type: file
+    filename: easyrsa.tgz
+    description: |
+      The release of the EasyRSA software you would like to use to create
+      certificate authority (CA) and other Public Key Infrastructure (PKI). 
+      This charm supports v3.0.1 -> v3.0.9, other versions of EasyRSA may not
+      work. You can find the releases of EasyRSA at
+      https://github.com/OpenVPN/easy-rsa/releases
+series:
+  - noble
+  - jammy

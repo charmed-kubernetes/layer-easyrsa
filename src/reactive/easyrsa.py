@@ -124,7 +124,7 @@ def configure_copy_extensions():
             if "[ CA_default ]" in line:
                 # Insert a new line with the copy_extensions key set to copy.
                 conf.insert(idx + 1, "copy_extensions = copy\n")
-        openssl_file.write_text("\n".join(conf))
+        openssl_file.write_text("".join(conf))
 
     # Ensure the openssl-*.cnf file is copied down to the pki directory
     # Remove any existing openssl-*.cnf files in the pki directory.

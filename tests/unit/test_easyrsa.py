@@ -258,7 +258,7 @@ class TestConfiguration(TestCase):
         pki_path.exists.return_value = False
         mock_glob.return_value = (mock_file,)
 
-        ssl_conf = "[ CA_default ]"
+        ssl_conf = "[ CA_default ]\n"
         expected_ssl_config_lines = [ssl_conf, "copy_extensions = copy\n"]
         mock_file.read_text.return_value = ssl_conf
 
@@ -267,9 +267,7 @@ class TestConfiguration(TestCase):
         easyrsa.configure_copy_extensions()
 
         # assert that the expected lines were written to the file
-        mock_file.write_text.assert_called_once_with(
-            "\n".join(expected_ssl_config_lines)
-        )
+        mock_file.write_text.assert_called_once_with("".join(expected_ssl_config_lines))
 
         # if the pki directory does not exist, no symlink should be created
         mock_copy.assert_not_called()

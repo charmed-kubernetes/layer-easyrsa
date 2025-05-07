@@ -1,8 +1,8 @@
-import glob
 import ipaddress
 import os
 import shutil
 
+from pathlib import Path
 from os.path import islink
 from shlex import split
 from subprocess import check_call, check_output, CalledProcessError
@@ -109,23 +109,30 @@ def configure_easyrsa():
 
 
 def configure_copy_extensions():
-    """Update the EasyRSA configuration with the capacity to copy the exensions
+    """Update the EasyRSA configuration with the capacity to copy the extensions
     through to the resulting certificates."""
-    # Create an absolute path to the file which will not be impacted by cwd.
-    (openssl_file,) = glob.iglob(os.path.join(easyrsa_directory, "openssl-*.cnf"))
+
+    (openssl_file,) = Path(easyrsa_directory).glob("openssl-*.cnf")
     # Update EasyRSA configuration with the capacity to copy CSR Requested
     # Extensions through to the resulting certificate. This can be tricky,
     # and the implications are not fully clear on this.
-    with open(openssl_file, "r") as f:
-        conf = f.readlines()
+
+    conf = openssl_file.read_text().splitlines(True)
     # When the copy_extensions key is not in the configuration.
     if "copy_extensions = copy\n" not in conf:
         for idx, line in enumerate(conf):
             if "[ CA_default ]" in line:
                 # Insert a new line with the copy_extensions key set to copy.
                 conf.insert(idx + 1, "copy_extensions = copy\n")
-        with open(openssl_file, "w+") as f:
-            f.writelines(conf)
+        openssl_file.write_text("".join(conf))
+
+    # Ensure the openssl-*.cnf file is copied down to the pki directory
+    # Remove any existing openssl-*.cnf files in the pki directory.
+    pki_path = openssl_file.parent / "pki"
+    if pki_path.exists():
+        for cnf in pki_path.glob("openssl-*.cnf"):
+            cnf.unlink()
+        shutil.copyfile(openssl_file, pki_path / openssl_file.name)
 
 
 def configure_client_authorization():

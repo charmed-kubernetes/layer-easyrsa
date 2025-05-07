@@ -112,28 +112,27 @@ def configure_copy_extensions():
     """Update the EasyRSA configuration with the capacity to copy the extensions
     through to the resulting certificates."""
 
-    openssl_confs = Path(easyrsa_directory).glob("openssl-*.cnf")
+    (openssl_file,) = Path(easyrsa_directory).glob("openssl-*.cnf")
     # Update EasyRSA configuration with the capacity to copy CSR Requested
     # Extensions through to the resulting certificate. This can be tricky,
     # and the implications are not fully clear on this.
 
-    for openssl_file in openssl_confs:
-        conf = openssl_file.read_text().splitlines(True)
-        # When the copy_extensions key is not in the configuration.
-        if "copy_extensions = copy\n" not in conf:
-            for idx, line in enumerate(conf):
-                if "[ CA_default ]" in line:
-                    # Insert a new line with the copy_extensions key set to copy.
-                    conf.insert(idx + 1, "copy_extensions = copy\n")
-            openssl_file.write_text("\n".join(conf))
+    conf = openssl_file.read_text().splitlines(True)
+    # When the copy_extensions key is not in the configuration.
+    if "copy_extensions = copy\n" not in conf:
+        for idx, line in enumerate(conf):
+            if "[ CA_default ]" in line:
+                # Insert a new line with the copy_extensions key set to copy.
+                conf.insert(idx + 1, "copy_extensions = copy\n")
+        openssl_file.write_text("\n".join(conf))
 
-        # Ensure the openssl-*.cnf file is copied down to the pki directory
-        # Remove any existing openssl-*.cnf files in the pki directory.
-        pki_path = openssl_file.parent / "pki"
-        if pki_path.exists():
-            for cnf in pki_path.glob("openssl-*.cnf"):
-                cnf.unlink()
-            shutil.copyfile(openssl_file, pki_path / openssl_file.name)
+    # Ensure the openssl-*.cnf file is copied down to the pki directory
+    # Remove any existing openssl-*.cnf files in the pki directory.
+    pki_path = openssl_file.parent / "pki"
+    if pki_path.exists():
+        for cnf in pki_path.glob("openssl-*.cnf"):
+            cnf.unlink()
+        shutil.copyfile(openssl_file, pki_path / openssl_file.name)
 
 
 def configure_client_authorization():

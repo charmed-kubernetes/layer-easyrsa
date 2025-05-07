@@ -1,6 +1,7 @@
 """Unit tests for easyrsa reactive layer."""
 
 from os import path
+from pathlib import Path
 from shlex import split
 from unittest import TestCase
 from unittest.mock import MagicMock, call, mock_open, patch
@@ -248,48 +249,54 @@ class TestConfiguration(TestCase):
             expected_version
         )
 
-    @patch(
-        "glob.iglob",
-        MagicMock(return_value=(SSL_CONF_FILE,)),
-    )
-    def test_configure_copy_extensions_when_missing(self):
+    @patch("pathlib.Path.glob")
+    @patch("shutil.copyfile")
+    def test_configure_copy_extensions_when_missing(self, mock_copy, mock_glob):
         """Test that `copy_extensions` attribute is added to ssl config."""
+        mock_file = MagicMock(autospec=Path)
+        pki_path = mock_file.parent / "pki"
+        pki_path.exists.return_value = False
+        mock_glob.return_value = (mock_file,)
+
         ssl_conf = "[ CA_default ]"
         expected_ssl_config_lines = [ssl_conf, "copy_extensions = copy\n"]
-        expected_open_calls = [
-            call(SSL_CONF_FILE, "r"),
-            call(SSL_CONF_FILE, "w+"),
-        ]
-        mock_file = mock_open(read_data=ssl_conf)
+        mock_file.read_text.return_value = ssl_conf
 
         # call configure_copy_extension and verify that
         # `copy_extensions = copy` line was added into [ CA_default ] section
-        with patch("builtins.open", mock_file):
-            easyrsa.configure_copy_extensions()
+        easyrsa.configure_copy_extensions()
 
-        mock_file.assert_has_calls(expected_open_calls, any_order=True)
-        file_handle = mock_file()
-        file_handle.writelines.assert_called_once_with(expected_ssl_config_lines)
+        # assert that the expected lines were written to the file
+        mock_file.write_text.assert_called_once_with(
+            "\n".join(expected_ssl_config_lines)
+        )
 
-    @patch(
-        "glob.iglob",
-        MagicMock(return_value=(SSL_CONF_FILE,)),
-    )
-    def test_configure_copy_extension_when_present(self):
+        # if the pki directory does not exist, no symlink should be created
+        mock_copy.assert_not_called()
+
+    @patch("pathlib.Path.glob")
+    @patch("shutil.copyfile")
+    def test_configure_copy_extension_when_present(self, mock_copy, mock_glob):
         """Test that ssl config file is unchanged.
 
         If `copy_extension = copy` is already present in the ssl config file,
         it should not be changed.
         """
+        mock_file = MagicMock(spec=Path)
+        mock_pki_file = MagicMock(spec=Path)
+        pki_path = mock_file.parent / "pki"
+        pki_path.exists.return_value = True
+        pki_path.glob.return_value = (mock_pki_file,)
+        mock_glob.return_value = (mock_file,)
+
         ssl_conf = "[ CA_default ]\ncopy_extensions = copy\n"
-        mock_file = mock_open(read_data=ssl_conf)
+        mock_file.read_text.return_value = ssl_conf
 
-        with patch("builtins.open", mock_file):
-            easyrsa.configure_copy_extensions()
+        easyrsa.configure_copy_extensions()
 
-        mock_file.assert_called_with(SSL_CONF_FILE, "r")
-        file_handle = mock_file()
-        file_handle.writelines.assert_not_called()
+        mock_file.write_text.assert_not_called()
+        mock_pki_file.unlink.assert_called_once_with()
+        mock_copy.assert_called_once_with(mock_file, pki_path / mock_file.name)
 
     def test_configure_client_authorization(self):
         """Test that 'clientAuth' is added as extendedUsage to server certs."""

@@ -20,7 +20,7 @@ async def test_build_and_deploy(ops_test: OpsTest, series):
     if not resource:
         log.info("Fetching Resource...")
         resources = await ops_test.download_resources(
-            charm.resolve(), None, "latest/edge"
+            charm.resolve(), None, "1.34/stable"
         )
     else:
         log.info("Using Resource...")

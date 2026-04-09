@@ -457,7 +457,7 @@ class RestoreActionTests(_ActionTestCase):
 
         # Test that `_replace_pki` safely unpacks pki backup.
         actions.shutil.move.assert_called_once_with(pki_dir, safety_backup)
-        pki_tar.extractall.assert_called_once_with(actions.easyrsa_directory)
+        pki_tar.extractall.assert_called_once_with(actions.easyrsa_directory, filter="data")
         actions.shutil.rmtree.assert_called_once_with(safety_backup)
 
     def test_path_traversal_in_backup_file(self):

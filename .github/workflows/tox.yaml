@@ -1,11 +1,8 @@
 name: Run tests with Tox
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     types: [ opened, synchronize, reopened ]
-    branches: [ main ]
 
 jobs:
   call-inclusive-naming-check:

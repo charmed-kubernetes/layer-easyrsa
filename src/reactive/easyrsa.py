@@ -26,7 +26,6 @@ from charms.leadership import leader_get
 
 from charms.layer import status
 
-
 charm_directory = hookenv.charm_dir()
 easyrsa_directory = os.path.join(charm_directory, "EasyRSA")
 
@@ -200,8 +199,8 @@ def create_certificate_authority():
             # Bluff required files and folders.
             with open("pki/index.txt", "w") as f_out:
                 pass
-            os.makedirs("pki/issued")
-            os.makedirs("pki/certs_by_serial")
+            os.makedirs("pki/issued", exist_ok=True)
+            os.makedirs("pki/certs_by_serial", exist_ok=True)
 
         else:
             hookenv.log("Creating new CA")

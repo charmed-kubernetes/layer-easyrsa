@@ -460,8 +460,8 @@ class TestCertificateManagement(TestCase):
             call(self.INDEX_FILE, "w"),
         ]
         expected_make_dirs = [
-            call("pki/issued"),
-            call("pki/certs_by_serial"),
+            call("pki/issued", exist_ok=True),
+            call("pki/certs_by_serial", exist_ok=True),
         ]
 
         # Setup mocks and handlers for cert/key/serial files

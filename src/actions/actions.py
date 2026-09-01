@@ -126,7 +126,7 @@ def _replace_pki(pki_tar, pki_dir):
     shutil.move(pki_dir, safety_backup)
     try:
         log("Extracting pki from backup", hookenv.DEBUG)
-        pki_tar.extractall(easyrsa_directory)
+        pki_tar.extractall(easyrsa_directory, filter="data")
     except Exception as exc:
         log("pki extraction failed: {}".format(exc), hookenv.WARNING)
         log("Restoring original pki.", hookenv.INFO)
